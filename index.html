@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Climate Transition Tracker</title>
+<style>
+  :root {
+    --bg: #020617; --panel: #0f172a; --border: #1e293b;
+    --text: #f1f5f9; --muted: #94a3b8; --dim: #64748b;
+    --up: #34d399; --down: #fb7185; --accent: #10b981; --sky: #38bdf8; --amber: #f59e0b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding: 16px; }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  .flex { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  h1 { font-size: 26px; letter-spacing: -0.02em; }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 4px; max-width: 640px; }
+  .actions { display: flex; gap: 8px; align-items: center; }
+  .badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1px solid; letter-spacing: 0.05em; }
+  .badge.live { color: var(--up); background: rgba(52,211,153,.12); border-color: rgba(52,211,153,.3); }
+  .badge.wait { color: var(--dim); background: rgba(100,116,139,.12); border-color: rgba(100,116,139,.3); }
+  button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); color: var(--muted); padding: 6px 12px; font-size: 13px; }
+  button:hover { color: #fff; border-color: #475569; }
+  button:disabled { opacity: .5; cursor: default; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
+  .err { margin-top: 16px; padding: 12px 16px; background: rgba(88,28,28,.35); border: 1px solid rgba(153,27,27,.5); border-radius: 12px; color: #fda4af; font-size: 14px; display: none; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 16px; }
+  .stat { padding: 12px 16px; }
+  .stat .label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); }
+  .stat .value { font-size: 17px; font-weight: 600; margin-top: 4px; }
+  .value.up { color: var(--up); } .value.down { color: var(--down); }
+  .idx { padding: 16px 18px; margin-top: 16px; }
+  .idx .label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); }
+  .idx .ival { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 4px; }
+  .idx .isub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .idx canvas { width: 100%; height: 130px; display: block; margin-top: 10px; }
+  .legend { display: flex; gap: 14px; font-size: 11px; color: var(--muted); align-items: center; flex-wrap: wrap; }
+  .legend .k { display: inline-flex; align-items: center; gap: 5px; }
+  .legend .dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 20px; padding: 6px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; width: fit-content; max-width: 100%; }
+  .tab { border: none; background: transparent; padding: 6px 12px; border-radius: 8px; font-size: 13px; }
+  .tab.active { background: var(--accent); color: #04211a; font-weight: 600; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 16px; }
+  .stock { padding: 14px 16px; transition: border-color .15s; }
+  .stock:hover { border-color: #475569; }
+  .stock .top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .stock .sym { font-weight: 700; font-size: 17px; }
+  .stock .name { color: var(--dim); font-size: 11px; margin-top: 1px; }
+  .stock .tags { display: flex; gap: 4px; margin-top: 5px; }
+  .tag { font-size: 9px; font-weight: 600; letter-spacing: .05em; padding: 1px 7px; border-radius: 999px; border: 1px solid; }
+  .tag.pure { color: var(--up); border-color: rgba(52,211,153,.35); background: rgba(52,211,153,.07); }
+  .tag.major { color: var(--muted); border-color: rgba(148,163,184,.35); background: rgba(148,163,184,.07); }
+  .tag.tracker { color: var(--sky); border-color: rgba(56,189,248,.35); background: rgba(56,189,248,.07); }
+  .stock .arrow { font-size: 13px; padding: 2px 8px; border-radius: 999px; border: 1px solid; }
+  .stock .arrow.up { color: var(--up); background: rgba(52,211,153,.08); border-color: rgba(52,211,153,.3); }
+  .stock .arrow.down { color: var(--down); background: rgba(251,113,133,.08); border-color: rgba(251,113,133,.3); }
+  .stock .prow { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 10px; }
+  .stock .price { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stock .chg { text-align: right; font-variant-numeric: tabular-nums; }
+  .stock .chg .pct { font-size: 13px; font-weight: 500; }
+  .stock .chg .abs { font-size: 11px; color: var(--muted); }
+  .stock canvas { width: 100%; height: 52px; display: block; margin-top: 8px; }
+  .stock .trendcap { font-size: 10px; color: #475569; margin-top: 2px; }
+  .up { color: var(--up); } .down { color: var(--down); }
+  .footer { color: var(--dim); font-size: 12px; margin-top: 20px; line-height: 1.6; }
+  @media (max-width: 640px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+
+  /* News feed */
+  #newsPanel { display: none; margin-top: 14px; }
+  .news-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .news-head h2 { margin: 0; font-size: 17px; }
+  .news-head .nmeta { color: var(--muted); font-size: 12px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+  .chip { border: 1px solid var(--border); background: transparent; color: var(--muted); padding: 4px 11px; border-radius: 999px; font-size: 12px; }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: #04211a; font-weight: 600; }
+  a.news-item { display: block; padding: 13px 6px; border-bottom: 1px solid var(--border); text-decoration: none; color: inherit; }
+  a.news-item:hover { background: rgba(56, 189, 248, 0.05); }
+  .news-item .nt { font-weight: 600; font-size: 14.5px; line-height: 1.35; }
+  .news-item .nsnip { color: var(--muted); font-size: 12.5px; margin-top: 3px; line-height: 1.45; }
+  .news-item .nrow { margin-top: 5px; font-size: 11.5px; color: var(--dim); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .nsrc { padding: 1px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.3px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="flex">
+    <div>
+      <h1>Climate Transition Tracker</h1>
+      <p class="sub" id="subtitle">Loading&hellip;</p>
+    </div>
+    <div class="actions">
+      <span class="badge wait" id="badge">WAIT</span>
+      <button id="btnRefresh">Refresh now</button>
+    </div>
+  </div>
+
+  <div class="err" id="error"></div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="card idx" id="indexPanel" style="display:none">
+    <div class="flex">
+      <div>
+        <div class="label">Climate Transition Index &mdash; market-cap weighted</div>
+        <div class="ival" id="idxValue">&mdash;</div>
+        <div class="isub" id="idxSub"></div>
+      </div>
+      <div class="legend">
+        <span class="k"><span class="dot" style="background:#38bdf8"></span>cap-weighted</span>
+        <span class="k"><span class="dot" style="background:#f59e0b"></span>equal-weighted</span>
+        <span class="k"><span class="dot" style="background:#334155"></span>baseline 1.0 (1 month ago)</span>
+      </div>
+    </div>
+    <canvas id="idxChart"></canvas>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+  <div class="grid" id="grid"></div>
+
+  <div id="newsPanel">
+    <div class="news-head">
+      <h2>&#128240; Climate sector news</h2>
+      <span class="nmeta" id="newsMeta"></span>
+      <button class="chip" id="btnNewsRefresh">Refresh news</button>
+    </div>
+    <div class="chips" id="newsChips"></div>
+    <div id="newsList"></div>
+  </div>
+
+  <p class="footer" id="footer"></p>
+</div>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------
+// Watchlist: the climate transition universe, tagged pure-play vs
+// major vs tracker. ETFs are shown as cards but excluded from the
+// index (they are trackers of this same universe).
+// ---------------------------------------------------------------
+const WATCHLIST = [
+  { group: "Iberian Energy", stocks: [
+    { s: "IBE.MC", n: "Iberdrola", t: "major" },
+    { s: "ANA.MC", n: "Acciona", t: "pure" },
+    { s: "ELE.MC", n: "Endesa", t: "major" },
+    { s: "NTGY.MC", n: "Naturgy", t: "major" },
+    { s: "RED.MC", n: "Redeia", t: "pure" },
+    { s: "SLR.MC", n: "Solaria", t: "pure" },
+    { s: "GRE.MC", n: "Grenergy", t: "pure" },
+    { s: "ENG.MC", n: "Enagas", t: "major" },
+  ]},
+  { group: "European Utilities & Renewables", stocks: [
+    { s: "ORSTED.CO", n: "Orsted", t: "major" },
+    { s: "RWE.DE", n: "RWE", t: "major" },
+    { s: "EOAN.DE", n: "E.ON", t: "major" },
+    { s: "ENEL.MI", n: "Enel", t: "major" },
+    { s: "ENGI.PA", n: "Engie", t: "major" },
+    { s: "EDPR.LS", n: "EDP Renovaveis", t: "pure" },
+    { s: "VER.VI", n: "Verbund", t: "pure" },
+    { s: "FORTUM.HE", n: "Fortum", t: "major" },
+    { s: "NESTE.HE", n: "Neste", t: "major" },
+  ]},
+  { group: "Transitioning Oil & Gas", stocks: [
+    { s: "SHEL", n: "Shell", t: "major" },
+    { s: "TTE", n: "TotalEnergies", t: "major" },
+    { s: "EQNR", n: "Equinor", t: "major" },
+    { s: "BP", n: "BP", t: "major" },
+    { s: "REP.MC", n: "Repsol", t: "major" },
+  ]},
+  { group: "Nuclear", stocks: [
+    { s: "CEG", n: "Constellation Energy", t: "major" },
+    { s: "VST", n: "Vistra", t: "major" },
+    { s: "OKLO", n: "Oklo", t: "pure" },
+    { s: "SMR", n: "NuScale Power", t: "pure" },
+    { s: "BWXT", n: "BWX Technologies", t: "major" },
+    { s: "CEZ.PR", n: "CEZ Group", t: "major" },
+  ]},
+  { group: "Wind & Solar Manufacturing", stocks: [
+    { s: "VWS.CO", n: "Vestas", t: "pure" },
+    { s: "NDX1.DE", n: "Nordex", t: "pure" },
+    { s: "ENR.DE", n: "Siemens Energy", t: "major" },
+    { s: "FSLR", n: "First Solar", t: "pure" },
+    { s: "ENPH", n: "Enphase", t: "pure" },
+    { s: "SEDG", n: "SolarEdge", t: "pure" },
+    { s: "601012.SS", n: "LONGi", t: "pure" },
+    { s: "688599.SS", n: "Trina Solar", t: "pure" },
+    { s: "002459.SZ", n: "JA Solar", t: "pure" },
+    { s: "600438.SS", n: "Tongwei", t: "pure" },
+    { s: "002202.SZ", n: "Goldwind", t: "pure" },
+    { s: "601615.SS", n: "Mingyang Smart Energy", t: "pure" },
+  ]},
+  { group: "Grid & Electrification", stocks: [
+    { s: "SU.PA", n: "Schneider Electric", t: "major" },
+    { s: "ABBN.SW", n: "ABB", t: "major" },
+    { s: "SIE.DE", n: "Siemens", t: "major" },
+    { s: "ETN", n: "Eaton", t: "major" },
+    { s: "PRY.MI", n: "Prysmian", t: "pure" },
+    { s: "NEX.PA", n: "Nexans", t: "pure" },
+    { s: "LR.PA", n: "Legrand", t: "major" },
+    { s: "NKT.CO", n: "NKT", t: "pure" },
+    { s: "300274.SZ", n: "Sungrow", t: "pure" },
+    { s: "002028.SZ", n: "Sieyuan", t: "pure" },
+  ]},
+  { group: "Energy Storage & Industrial Batteries", stocks: [
+    { s: "FLNC", n: "Fluence Energy", t: "pure" },
+    { s: "STEM", n: "Stem Inc", t: "pure" },
+    { s: "EOSE", n: "Eos Energy", t: "pure" },
+    { s: "300014.SZ", n: "EVE Energy", t: "pure" },
+    { s: "002074.SZ", n: "Gotion High-Tech", t: "pure" },
+  ]},
+  { group: "EV & Batteries", stocks: [
+    { s: "002594.SZ", n: "BYD", t: "major" },
+    { s: "TSLA", n: "Tesla", t: "major" },
+    { s: "300750.SZ", n: "CATL", t: "pure" },
+    { s: "002460.SZ", n: "Ganfeng Lithium", t: "pure" },
+    { s: "NIO", n: "NIO", t: "pure" },
+    { s: "XPEV", n: "XPeng", t: "pure" },
+    { s: "LI", n: "Li Auto", t: "pure" },
+    { s: "RNO.PA", n: "Renault", t: "major" },
+    { s: "VOLV-B.ST", n: "Volvo", t: "major" },
+    { s: "PSNY", n: "Polestar", t: "pure" },
+  ]},
+  { group: "Heat Pumps & Efficiency", stocks: [
+    { s: "NIBE-B.ST", n: "Nibe", t: "pure" },
+    { s: "ROCK-B.CO", n: "Rockwool", t: "pure" },
+    { s: "KRX.IR", n: "Kingspan", t: "pure" },
+    { s: "CARR", n: "Carrier", t: "major" },
+    { s: "TT", n: "Trane Technologies", t: "major" },
+  ]},
+  { group: "Hydrogen", stocks: [
+    { s: "ITM.L", n: "ITM Power", t: "pure" },
+    { s: "NEL.OL", n: "Nel", t: "pure" },
+    { s: "NCH2.DE", n: "thyssenkrupp nucera", t: "pure" },
+    { s: "PLUG", n: "Plug Power", t: "pure" },
+    { s: "CWR.L", n: "Ceres Power", t: "pure" },
+    { s: "BE", n: "Bloom Energy", t: "pure" },
+  ]},
+  { group: "Water & Waste", stocks: [
+    { s: "VIE.PA", n: "Veolia", t: "pure" },
+    { s: "XYL", n: "Xylem", t: "pure" },
+    { s: "AWK", n: "American Water Works", t: "pure" },
+    { s: "SVT.L", n: "Severn Trent", t: "pure" },
+    { s: "UU.L", n: "United Utilities", t: "pure" },
+    { s: "PNR", n: "Pentair", t: "pure" },
+    { s: "0371.HK", n: "Beijing Enterprises Water", t: "pure" },
+  ]},
+  { group: "Climate Trackers & Carbon", stocks: [
+    { s: "ICLN", n: "iShares Global Clean Energy", t: "tracker" },
+    { s: "INRG.L", n: "iShares Global Clean Energy (LSE)", t: "tracker" },
+    { s: "PBW", n: "Invesco WilderHill Clean Energy", t: "tracker" },
+    { s: "QCLN", n: "First Trust Nasdaq Clean Edge", t: "tracker" },
+    { s: "FAN", n: "First Trust Global Wind", t: "tracker" },
+    { s: "KRBN", n: "iShares Global Carbon Index (EUAs+CCAs)", t: "tracker" },
+    { s: "KCCA", n: "KraneShares California Carbon", t: "tracker" },
+    { s: "400570.KS", n: "KODEX Europe Carbon Allowance Futures", t: "tracker" },
+  ]},
+];
+const ALL = WATCHLIST.flatMap(g => g.stocks);
+const SYMBOLS = ALL.map(x => x.s);
+const INDEX_STOCKS = ALL.filter(x => x.t !== "tracker");
+// Market caps in millions EUR, as of 2026-11-13 (Yahoo Finance, converted via ECB-market FX rates)
+const MCAPS = {
+  "TSLA": 1420520,
+  "SHEL": 252085,
+  "SIE.DE": 210579,
+  "TTE": 177577,
+  "IBE.MC": 156196,
+  "300750.SZ": 149611,
+  "SU.PA": 142903,
+  "ABBN.SW": 137607,
+  "ETN": 126124,
+  "ENR.DE": 112993,
+  "BP": 106710,
+  "002594.SZ": 99199,
+  "ENEL.MI": 98123,
+  "EQNR": 91485,
+  "CEG": 89782,
+  "TT": 83930,
+  "ENGI.PA": 63820,
+  "VOLV-B.ST": 59114,
+  "BE": 53983,
+  "EOAN.DE": 50809,
+  "RWE.DE": 46440,
+  "ELE.MC": 46278,
+  "VST": 41279,
+  "CARR": 40222,
+  "LR.PA": 36143,
+  "PRY.MI": 32860,
+  "REP.MC": 32514,
+  "CEZ.PR": 29420,
+  "NTGY.MC": 28551,
+  "AWK": 26569,
+  "VER.VI": 25848,
+  "VIE.PA": 25415,
+  "VWS.CO": 25338,
+  "ORSTED.CO": 25209,
+  "300274.SZ": 21853,
+  "FORTUM.HE": 21113,
+  "NESTE.HE": 21013,
+  "XYL": 19498,
+  "KRX.IR": 17622,
+  "FSLR": 16745,
+  "EDPR.LS": 14666,
+  "UU.L": 14012,
+  "300014.SZ": 13766,
+  "SVT.L": 12127,
+  "601012.SS": 12060,
+  "002028.SZ": 11789,
+  "ANA.MC": 10939,
+  "LI": 10330,
+  "BWXT": 10272,
+  "002460.SZ": 10216,
+  "NDX1.DE": 9864,
+  "PNR": 9837,
+  "RED.MC": 8650,
+  "NIBE-B.ST": 8310,
+  "002202.SZ": 8219,
+  "RNO.PA": 8198,
+  "XPEV": 8194,
+  "600438.SS": 6950,
+  "NIO": 6910,
+  "NKT.CO": 6217,
+  "ROCK-B.CO": 5961,
+  "002074.SZ": 5756,
+  "NEX.PA": 5673,
+  "ENG.MC": 4750,
+  "OKLO": 4317,
+  "688599.SS": 3228,
+  "ENPH": 3204,
+  "002459.SZ": 2823,
+  "601615.SS": 2436,
+  "SLR.MC": 2094,
+  "GRE.MC": 1903,
+  "SMR": 1789,
+  "0371.HK": 1612,
+  "PLUG": 1562,
+  "SEDG": 1360,
+  "NCH2.DE": 1016,
+  "FLNC": 833,
+  "CWR.L": 672,
+  "PSNY": 633,
+  "EOSE": 600,
+  "ITM.L": 584,
+  "NEL.OL": 343,
+  "STEM": 20,
+};
+const CACHE_KEY = "climate_cache_v1";
+const sleep = ms => new Promise(res => setTimeout(res, ms));
+
+// ---------------------------------------------------------------
+// State
+// ---------------------------------------------------------------
+let quotes = {};      // sym -> { c, prev, dp, d, cur, hist: [{t,p}] }
+let indexData = null;  // { dates: [...], cap: [...], eq: [...] }
+let activeTab = "Iberian Energy";
+let loading = false;
+let lastUpdated = null;
+let failedSymbols = [];
+let timer = null;
+
+// ---------------------------------------------------------------
+// Yahoo Finance (unofficial) via public CORS proxies, no API key.
+// Chain of proxies: if one is down or rate-limiting (allorigins
+// had a full outage on 13 Nov 2026), we fall through to the next
+// and remember which one last worked.
+// ---------------------------------------------------------------
+const QUOTE_PROXIES = [
+  u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
+  u => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(u),
+  // r.jina.ai wraps payloads in a small markdown header — parseJsonLoose
+  // strips it. Only viable since we batch 15 symbols per request now.
+  u => "https://r.jina.ai/" + u,
+];
+let proxyIdx = { quotes: 0, news: 0 };
+// proxies that just failed are skipped for PROXY_COOLDOWN so a dead
+// proxy at the front of the chain doesn't stall every request
+const proxyDeadUntil = { quotes: [], news: [] };
+const PROXY_COOLDOWN = 10 * 60 * 1000;
+
+async function proxyFetch(url, kind) {
+  const chain = kind === "news" ? NEWS_PROXIES : QUOTE_PROXIES;
+  const dead = proxyDeadUntil[kind];
+  let order = [];
+  for (let k = 0; k < chain.length; k++) {
+    const i = (proxyIdx[kind] + k) % chain.length;
+    if (dead[i] && Date.now() < dead[i]) continue;
+    order.push(i);
+  }
+  if (!order.length) {
+    // everything in cooldown — try once anyway, it may have recovered
+    for (let k = 0; k < chain.length; k++) order.push((proxyIdx[kind] + k) % chain.length);
+  }
+  let lastErr = null;
+  for (const i of order) {
+    try {
+      const opts = typeof AbortSignal !== "undefined" && AbortSignal.timeout
+        ? { signal: AbortSignal.timeout(15000) } : {};
+      const r = await fetch(chain[i](url), opts);
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const t = await r.text();
+      const trimmed = (t || "").trim();
+      if (trimmed.length < 25 || /^(error code|oops|rate limit|too many)/i.test(trimmed)) {
+        throw new Error("proxy refused");
+      }
+      proxyIdx[kind] = i;
+      dead[i] = 0;
+      return t;
+    } catch (e) { lastErr = e; dead[i] = Date.now() + PROXY_COOLDOWN; }
+  }
+  throw lastErr || new Error("all proxies failed");
+}
+
+async function fetchOne(sym) {
+  const target = "https://query1.finance.yahoo.com/v8/finance/chart/" +
+    encodeURIComponent(sym) + "?range=1mo&interval=1d";
+  const text = await proxyFetch(target, "quotes");
+  const j = parseJsonLoose(text);
+  const res = j && j.chart && j.chart.result && j.chart.result[0];
+  if (!res) throw new Error("no data");
+  const m = res.meta || {};
+  const ts = res.timestamp || [];
+  const closes = (res.indicators && res.indicators.quote && res.indicators.quote[0] &&
+    res.indicators.quote[0].close) || [];
+  const hist = [];
+  ts.forEach((t, i) => { if (closes[i] != null) hist.push({ t, p: closes[i] }); });
+  const price = m.regularMarketPrice;
+  if (!price || !hist.length) throw new Error("empty");
+  const prev = hist.length >= 2 ? hist[hist.length - 2].p : (m.chartPreviousClose || hist[0].p);
+  return {
+    c: price,
+    prev: prev,
+    dp: (price - prev) / prev * 100,
+    d: price - prev,
+    cur: m.currency || symCurrency(sym),
+    hist: hist,
+  };
+}
+
+// Tolerant JSON extraction: proxies sometimes wrap the payload
+// (r.jina.ai prepends a small markdown header), so slice from the
+// first "{" to the last "}".
+function parseJsonLoose(text) {
+  const a = text.indexOf("{"), b = text.lastIndexOf("}");
+  if (a < 0 || b <= a) throw new Error("not JSON");
+  return JSON.parse(text.slice(a, b + 1));
+}
+
+// Currency per exchange suffix — the multi-symbol spark API
+// doesn't return a currency field, but the suffix of each Yahoo
+// symbol pins it down deterministically.
+const CURR_BY_SUFFIX = {
+  MC: "EUR", DE: "EUR", PA: "EUR", AS: "EUR", MI: "EUR", VI: "EUR",
+  HE: "EUR", IR: "EUR", LS: "EUR", BR: "EUR",
+  SW: "CHF", L: "GBp", CO: "DKK", OL: "NOK", ST: "SEK", PR: "CZK",
+  SS: "CNY", SZ: "CNY", HK: "HKD", KS: "KRW",
+};
+function symCurrency(s) {
+  const i = s.lastIndexOf(".");
+  return i < 0 ? "USD" : (CURR_BY_SUFFIX[s.slice(i + 1)] || "USD");
+}
+
+// Multi-symbol spark fetch: one request for ~15 symbols instead of
+// 91 single-symbol requests. Yahoo rejects chunks much larger than
+// that (HTTP 400), so keep SPARK_CHUNK at 15.
+const SPARK_CHUNK = 15;
+async function fetchSparkChunk(symbols) {
+  const target = "https://query1.finance.yahoo.com/v8/finance/spark?symbols=" +
+    symbols.map(encodeURIComponent).join(",") + "&range=1mo&interval=1d";
+  const text = await proxyFetch(target, "quotes");
+  const j = parseJsonLoose(text);
+  const out = {};
+  symbols.forEach(s => {
+    const r = j[s];
+    if (!r || !r.close || r.close.length < 2) return;
+    const hist = [];
+    (r.timestamp || []).forEach((t, i) => { if (r.close[i] != null) hist.push({ t, p: r.close[i] }); });
+    if (hist.length < 2) return;
+    const price = r.fulldayPrice != null ? r.fulldayPrice : hist[hist.length - 1].p;
+    const prev = hist[hist.length - 2].p;
+    out[s] = {
+      c: price, prev: prev,
+      dp: (price - prev) / prev * 100, d: price - prev,
+      cur: (quotes[s] && quotes[s].cur) || symCurrency(s),
+      hist: hist,
+    };
+  });
+  return out;
+}
+
+async function fetchBatched(symbols, into, failed) {
+  const CHUNK = 6;
+  for (let i = 0; i < symbols.length; i += CHUNK) {
+    const batch = symbols.slice(i, i + CHUNK);
+    const results = await Promise.allSettled(batch.map(s => fetchOne(s)));
+    results.forEach((res, j) => {
+      if (res.status === "fulfilled") into[batch[j]] = res.value;
+      else failed.push(batch[j]);
+    });
+    quotes = into;
+    render();
+    if (i + CHUNK < symbols.length) await sleep(1300);
+  }
+}
+
+async function fetchAll() {
+  if (loading) return;
+  loading = true;
+  document.getElementById("btnRefresh").disabled = true;
+  document.getElementById("btnRefresh").textContent = "Refreshing\u2026";
+  showError(null);
+  failedSymbols = [];
+  const next = {};
+  const failed = [];
+  // fast path: multi-symbol spark API — 7 requests for 91 names
+  // instead of 91 requests (much gentler on the free proxies)
+  for (let i = 0; i < SYMBOLS.length; i += SPARK_CHUNK) {
+    const chunk = SYMBOLS.slice(i, i + SPARK_CHUNK);
+    try {
+      Object.assign(next, await fetchSparkChunk(chunk));
+    } catch (e) { /* whole chunk failed — retried below */ }
+    chunk.forEach(s => { if (!next[s]) failed.push(s); });
+    quotes = next;
+    render();
+    if (i + SPARK_CHUNK < SYMBOLS.length) await sleep(700);
+  }
+  // stragglers: single-symbol chart requests (returns currency,
+  // better per-symbol errors)
+  if (failed.length) {
+    await sleep(2500);
+    await fetchBatched(failed, next, failedSymbols = []);
+  }
+  if (Object.keys(next).length === 0) {
+    showError("Couldn't reach Yahoo Finance \u2014 the CORS proxy chain (allorigins / codetabs / jina) is down or rate-limiting. " +
+      "Wait a minute and hit Refresh now; cached data is still shown.");
+  } else {
+    quotes = next;
+    failedSymbols = SYMBOLS.filter(s => !next[s]);
+    indexData = computeIndex(next);
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), quotes: next })); } catch (e) {}
+    lastUpdated = new Date();
+  }
+  loading = false;
+  document.getElementById("btnRefresh").disabled = false;
+  document.getElementById("btnRefresh").textContent = "Refresh now";
+  render();
+}
+
+// ---------------------------------------------------------------
+// Index: cap-weighted vs equal-weighted over the real 1-month
+// daily history. Each stock normalized to its first close in the
+// window; values forward-filled to the union of trading days.
+// ---------------------------------------------------------------
+function computeIndex(q) {
+  const syms = INDEX_STOCKS.map(x => x.s).filter(s => q[s] && q[s].hist.length > 2 && MCAPS[s]);
+  if (!syms.length) return null;
+  const capSum = syms.reduce((a, s) => a + MCAPS[s], 0);
+  const datesSet = new Set();
+  syms.forEach(s => q[s].hist.forEach(h => datesSet.add(h.t)));
+  const dates = [...datesSet].sort((a, b) => a - b);
+  const cap = [], eq = [];
+  const lastSeen = {};
+  for (const t of dates) {
+    let capV = 0, eqV = 0;
+    for (const s of syms) {
+      const h = q[s].hist.find(x => x.t === t);
+      if (h) lastSeen[s] = h.p;
+      if (lastSeen[s] == null) continue;
+      const base = q[s].hist[0].p;
+      const r = lastSeen[s] / base;
+      capV += (MCAPS[s] / capSum) * r;
+      eqV += r / syms.length;
+    }
+    cap.push({ t, v: capV });
+    eq.push({ t, v: eqV });
+  }
+  return { cap, eq, n: syms.length };
+}
+
+// ---------------------------------------------------------------
+// Charts (Canvas 2D, no dependencies)
+// ---------------------------------------------------------------
+function drawSpark(cv, data, up) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth || 280, h = cv.clientHeight || 52;
+  cv.width = w * dpr; cv.height = h * dpr;
+  const ctx = cv.getContext("2d");
+  ctx.scale(dpr, dpr);
+  const ps = data.map(d => d.p);
+  const min = Math.min.apply(null, ps), max = Math.max.apply(null, ps);
+  const span = (max - min) || 1;
+  const X = i => (i / (data.length - 1)) * (w - 8) + 4;
+  const Y = p => h - 6 - ((p - min) / span) * (h - 12);
+  const color = up ? "#34d399" : "#fb7185";
+  ctx.clearRect(0, 0, w, h);
+  ctx.beginPath();
+  data.forEach((d, i) => i ? ctx.lineTo(X(i), Y(d.p)) : ctx.moveTo(X(0), Y(d.p)));
+  ctx.lineTo(X(data.length - 1), h); ctx.lineTo(X(0), h); ctx.closePath();
+  ctx.fillStyle = up ? "rgba(52,211,153,0.10)" : "rgba(251,113,133,0.10)";
+  ctx.fill();
+  ctx.beginPath();
+  data.forEach((d, i) => i ? ctx.lineTo(X(i), Y(d.p)) : ctx.moveTo(X(0), Y(d.p)));
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(X(data.length - 1), Y(ps[ps.length - 1]), 3, 0, Math.PI * 2);
+  ctx.fillStyle = color; ctx.fill();
+}
+
+function drawMulti(cv, series) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth || 600, h = cv.clientHeight || 130;
+  cv.width = w * dpr; cv.height = h * dpr;
+  const ctx = cv.getContext("2d");
+  ctx.scale(dpr, dpr);
+  let min = Infinity, max = -Infinity;
+  series.forEach(s => s.data.forEach(d => { if (d.v < min) min = d.v; if (d.v > max) max = d.v; }));
+  if (!isFinite(min) || series.some(s => s.data.length < 2)) return;
+  const span = (max - min) || 1;
+  const X = (data, i) => (i / (data.length - 1)) * (w - 8) + 4;
+  const Y = v => h - 8 - ((v - min) / span) * (h - 16);
+  ctx.clearRect(0, 0, w, h);
+  if (min <= 1 && max >= 1) {
+    ctx.beginPath(); ctx.setLineDash([3, 4]);
+    ctx.moveTo(0, Y(1)); ctx.lineTo(w, Y(1));
+    ctx.strokeStyle = "#334155"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  series.forEach(s => {
+    ctx.beginPath();
+    s.data.forEach((d, i) => i ? ctx.lineTo(X(s.data, i), Y(d.v)) : ctx.moveTo(X(s.data, 0), Y(d.v)));
+    ctx.strokeStyle = s.color; ctx.lineWidth = 2; ctx.stroke();
+    const last = s.data[s.data.length - 1];
+    ctx.beginPath();
+    ctx.arc(X(s.data, s.data.length - 1), Y(last.v), 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = s.color; ctx.fill();
+  });
+}
+
+// ---------------------------------------------------------------
+// Formatting (multi-currency)
+// ---------------------------------------------------------------
+const CUR_PREFIX = { USD: "$", EUR: "\u20ac", CNY: "\u00a5", HKD: "HK$" };
+const CUR_SUFFIX = { DKK: "kr", SEK: "kr", NOK: "kr", CHF: "CHF", CZK: "K\u010d", KRW: "\u20a9" };
+function fmtPrice(p, cur) {
+  const dec = p >= 1000 ? 0 : p >= 100 ? 1 : 2;
+  const num = p.toLocaleString(undefined, { maximumFractionDigits: dec });
+  if (cur === "GBp") return Math.round(p).toLocaleString() + "p";
+  if (CUR_PREFIX[cur]) return CUR_PREFIX[cur] + num;
+  if (CUR_SUFFIX[cur]) return num + " " + CUR_SUFFIX[cur];
+  return num + " " + cur;
+}
+function fmt(n, d) { return (n >= 0 ? "+" : "") + n.toFixed(d); }
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+// ---------------------------------------------------------------
+// Render
+// ---------------------------------------------------------------
+function activeStocks() {
+  if (activeTab === "All") return ALL;
+  const g = WATCHLIST.find(g => g.group === activeTab);
+  return g ? g.stocks : [];
+}
+
+function stat(label, value, tone) {
+  return '<div class="card stat"><div class="label">' + label + '</div>' +
+    '<div class="value ' + (tone || "") + '">' + value + "</div></div>";
+}
+
+function render() {
+  const n = SYMBOLS.length;
+  document.getElementById("subtitle").innerHTML =
+    n + " climate-transition names across Europe, China and the US \u00b7 live prices &amp; 1-month trends via Yahoo Finance \u00b7 no API key needed \u00b7 refreshes every 5 min";
+  const badge = document.getElementById("badge");
+  badge.textContent = lastUpdated ? "LIVE" : (Object.keys(quotes).length ? "CACHED" : "WAIT");
+  badge.className = "badge " + (lastUpdated ? "live" : "wait");
+
+  // stats
+  const qs = Object.values(quotes).filter(q => q.dp !== undefined);
+  let best = "\u2014", worst = "\u2014", avg = "\u2014", idxStr = "\u2014", idxTone = "";
+  const bySym = Object.entries(quotes).sort((a, b) => (b[1].dp || 0) - (a[1].dp || 0));
+  if (bySym.length) {
+    const f = e => e[0] + " " + fmt(e[1].dp, 2) + "%";
+    best = f(bySym[0]); worst = f(bySym[bySym.length - 1]);
+    avg = fmt(bySym.reduce((a, e) => a + e[1].dp, 0) / bySym.length, 2) + "%";
+  }
+  if (indexData && indexData.cap.length > 1) {
+    const lastV = indexData.cap[indexData.cap.length - 1].v;
+    const chg = (lastV - 1) * 100;
+    idxStr = fmt(chg, 2) + "%";
+    idxTone = chg >= 0 ? "up" : "down";
+  }
+  document.getElementById("stats").innerHTML =
+    stat("Index (1M)", idxStr, idxTone) +
+    stat("Avg day change", avg, avg.startsWith("+") ? "up" : "down") +
+    stat("Best", best, "up") +
+    stat("Worst", worst, "down");
+
+  // index panel
+  const panel = document.getElementById("indexPanel");
+  if (indexData && indexData.cap.length > 1) {
+    panel.style.display = "block";
+    const cap = indexData.cap, eq = indexData.eq;
+    const chg = (cap[cap.length - 1].v - 1) * 100;
+    const eqChg = (eq[eq.length - 1].v - 1) * 100;
+    const dayCap = cap.length > 1 ? (cap[cap.length - 1].v / cap[cap.length - 2].v - 1) * 100 : 0;
+    document.getElementById("idxValue").textContent = cap[cap.length - 1].v.toFixed(4);
+    document.getElementById("idxSub").innerHTML =
+      "1M: <b class='" + (chg >= 0 ? "up" : "down") + "'>" + fmt(chg, 2) + "%</b> (cap-weighted) vs " +
+      fmt(eqChg, 2) + "% (equal-weighted) \u00b7 today " + fmt(dayCap, 2) + "%" +
+      " \u00b7 " + indexData.n + " stocks \u00b7 ETFs excluded \u00b7 weights as of 13 Nov 2026";
+    drawMulti(document.getElementById("idxChart"), [
+      { data: cap, color: "#38bdf8" },
+      { data: eq, color: "#f59e0b" },
+    ]);
+  } else {
+    panel.style.display = "none";
+  }
+
+  // tabs
+  document.getElementById("tabs").innerHTML =
+    WATCHLIST.map(g => '<button class="tab' + (activeTab === g.group ? " active" : "") +
+      '" data-tab="' + esc(g.group) + '">' + esc(g.group) + "</button>").join("") +
+    '<button class="tab' + (activeTab === "All" ? " active" : "") + '" data-tab="All">All</button>' +
+    '<button class="tab' + (activeTab === "News" ? " active" : "") + '" data-tab="News">\uD83D\uDCF0 News</button>';
+
+  // grid
+  document.getElementById("grid").innerHTML = activeStocks().map(x => {
+    const q = quotes[x.s];
+    const up = q ? q.dp >= 0 : true;
+    const tagLabel = { pure: "PURE-PLAY", major: "MAJOR", tracker: "TRACKER" }[x.t] || "";
+    return '<div class="card stock">' +
+      '<div class="top"><div><div class="sym">' + esc(x.s) + '</div>' +
+      '<div class="name">' + esc(x.n) + '</div></div>' +
+      '<span class="arrow ' + (up ? "up" : "down") + '">' + (q ? (up ? "\u25b2" : "\u25bc") : "") + "</span></div>" +
+      '<div class="tags"><span class="tag ' + x.t + '">' + tagLabel + "</span></div>" +
+      '<div class="prow"><div class="price">' + (q ? fmtPrice(q.c, q.cur) : "\u2026") + "</div>" +
+      '<div class="chg"><div class="pct ' + (up ? "up" : "down") + '">' + (q ? fmt(q.dp, 2) + "%" : "") + "</div>" +
+      '<div class="abs">' + (q ? fmt(q.d, 2) + " today" : "") + "</div></div></div>" +
+      (q && q.hist.length > 1
+        ? '<canvas data-sym="' + esc(x.s) + '"></canvas>' +
+          '<div class="trendcap">1-month trend \u00b7 daily closes</div>'
+        : "") +
+      "</div>";
+  }).join("");
+
+  document.querySelectorAll("#grid canvas").forEach(cv => {
+    const q = quotes[cv.dataset.sym];
+    if (q && q.hist.length > 1) drawSpark(cv, q.hist, q.dp >= 0);
+  });
+
+  document.getElementById("footer").innerHTML =
+    (lastUpdated
+      ? "Last updated " + lastUpdated.toLocaleTimeString()
+      : Object.keys(quotes).length
+        ? "Showing cached data from a previous session \u2014 refreshing now\u2026"
+        : "Loading\u2026") +
+    (failedSymbols.length ? " \u00b7 no data: " + failedSymbols.join(", ") : "") +
+    "<br>Data: Yahoo Finance (unofficial API, batched spark requests) via CORS proxy chain (allorigins \u2192 codetabs \u2192 jina) \u00b7 market hours \u2014 Europe 09:00\u201317:30 CET, China 09:30\u201315:00 CST, US 15:30\u201322:00 CET" +
+    "<br>Index = basket of the 83 stocks, each normalized to its close one month ago; weights are market caps in EUR (13 Nov 2026). Not investment advice." +
+    "<br>News: Carbon Brief, Climate Home News, The Guardian, CleanTechnica &amp; PV Magazine via RSS \u00b7 quotes auto-refresh every 5 min, news every 30 min";
+  renderNews();
+}
+
+function showError(msg) {
+  const el = document.getElementById("error");
+  el.style.display = msg ? "block" : "none";
+  el.textContent = msg || "";
+}
+
+// ---------------------------------------------------------------
+// Climate sector news: 5 RSS feeds fetched through the proxy
+// chain, with a third fallback (r.jina.ai reader) that converts
+// feeds to markdown — it parses differently but keeps working
+// when the classic proxies are both down. Merged, deduped and
+// sorted newest-first.
+// ---------------------------------------------------------------
+const NEWS_KEY = "climate_news_v1";
+const NEWS_TTL = 30 * 60 * 1000; // refetch at most every 30 min
+const NEWS_PROXIES = QUOTE_PROXIES.slice(); // same chain: allorigins \u2192 codetabs \u2192 jina
+
+const NEWS_FEEDS = [
+  { id: "cb",  name: "Carbon Brief",  url: "https://www.carbonbrief.org/feed/",          color: "#38bdf8" },
+  { id: "chn", name: "Climate Home",  url: "https://www.climatechangenews.com/feed/",    color: "#34d399" },
+  { id: "gu",  name: "Guardian Env",  url: "https://www.theguardian.com/environment/rss", color: "#f59e0b" },
+  { id: "ct",  name: "CleanTechnica", url: "https://cleantechnica.com/feed/",            color: "#a78bfa" },
+  { id: "pv",  name: "PV Magazine",   url: "https://www.pv-magazine.com/feed/",          color: "#f472b6" },
+];
+
+let newsItems = [];
+let newsLoading = false;
+let newsUpdatedAt = null;
+let newsFilter = "all";
+
+function parseFeedXML(text, feed) {
+  const out = [];
+  try {
+    const doc = new DOMParser().parseFromString(text, "text/xml");
+    doc.querySelectorAll("item").forEach(it => {
+      const title = (it.querySelector("title") || {}).textContent || "";
+      let link = (it.querySelector("link") || {}).textContent || "";
+      if (!link) { const lo = it.querySelector("link"); link = lo && lo.getAttribute ? (lo.getAttribute("href") || "") : ""; }
+      const pub = (it.querySelector("pubDate") || {}).textContent || "";
+      const desc = (it.querySelector("description") || {}).textContent || "";
+      out.push({
+        title: title, link: link,
+        date: pub ? new Date(pub) : null,
+        source: feed.name, sid: feed.id, color: feed.color,
+        snippet: desc.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160),
+      });
+    });
+  } catch (e) {}
+  return out;
+}
+
+function parseFeedJina(text, feed) {
+  // r.jina.ai renders RSS as markdown: "### [Title](url)" + a date
+  // line. Format validated against all 5 feeds on 13 Nov 2026.
+  const out = [];
+  for (const c of text.split("\n### [").slice(1)) {
+    const m = c.match(/^([^\]]+)\]\((https?:\/\/[^\)]+)\)/);
+    if (!m) continue;
+    const d = c.match(/[A-Z][a-z]{2}, \d{1,2} [A-Z][a-z]{2} \d{4} [\d:]+ (?:\+0000|GMT)/);
+    let snippet = "";
+    for (const line of c.split("\n").slice(1)) {
+      const t = line.trim();
+      if (!t || /^\[?https?:\/\//.test(t) || /^[A-Z][a-z]{2}, \d/.test(t) || t.startsWith("[")) continue;
+      snippet = t.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[*_#]/g, "").slice(0, 160);
+      break;
+    }
+    out.push({
+      title: m[1], link: m[2],
+      date: d ? new Date(d[0].replace("GMT", "+0000")) : null,
+      source: feed.name, sid: feed.id, color: feed.color,
+      snippet: snippet,
+    });
+  }
+  return out;
+}
+
+async function fetchNews() {
+  if (newsLoading) return;
+  newsLoading = true;
+  renderNews();
+  const collected = [];
+  for (const f of NEWS_FEEDS) {
+    try {
+      const t = await proxyFetch(f.url, "news");
+      const items = /<rss|<item|<feed/i.test(t.slice(0, 600)) ? parseFeedXML(t, f) : parseFeedJina(t, f);
+      collected.push(...items);
+    } catch (e) { /* feed unreachable for now, skip it */ }
+  }
+  collected.sort((a, b) => ((b.date && b.date.getTime()) || 0) - ((a.date && a.date.getTime()) || 0));
+  const seen = new Set(), uniq = [];
+  for (const it of collected) {
+    const k = it.title.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (k && !seen.has(k)) { seen.add(k); uniq.push(it); }
+  }
+  if (uniq.length) {
+    newsItems = uniq.slice(0, 60);
+    newsUpdatedAt = new Date();
+    try { localStorage.setItem(NEWS_KEY, JSON.stringify({ ts: Date.now(), items: newsItems })); } catch (e) {}
+  }
+  newsLoading = false;
+  renderNews();
+}
+
+function newsStale() {
+  return !newsUpdatedAt || Date.now() - newsUpdatedAt.getTime() > NEWS_TTL;
+}
+
+function timeAgo(d) {
+  if (!d || isNaN(d.getTime())) return "";
+  const s = (Date.now() - d.getTime()) / 1000;
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.floor(s / 60) + "m ago";
+  if (s < 86400) return Math.floor(s / 3600) + "h ago";
+  return Math.floor(s / 86400) + "d ago";
+}
+
+function renderNews() {
+  const panel = document.getElementById("newsPanel");
+  const isNews = activeTab === "News";
+  panel.style.display = isNews ? "block" : "none";
+  document.getElementById("grid").style.display = isNews ? "none" : "";
+  if (!isNews) return;
+
+  const chips = [{ id: "all", name: "All sources" }].concat(NEWS_FEEDS);
+  document.getElementById("newsChips").innerHTML = chips.map(c =>
+    '<button class="chip' + (newsFilter === c.id ? " on" : "") + '" data-src="' + c.id + '">' + esc(c.name) + "</button>").join("");
+  document.getElementById("newsMeta").textContent = newsLoading
+    ? "Refreshing\u2026"
+    : (newsUpdatedAt ? "Updated " + timeAgo(newsUpdatedAt) : "");
+
+  const list = (newsFilter === "all" ? newsItems : newsItems.filter(i => i.sid === newsFilter)).slice(0, 40);
+  document.getElementById("newsList").innerHTML = list.length
+    ? list.map(i =>
+        '<a class="news-item" href="' + esc(i.link) + '" target="_blank" rel="noopener">' +
+        '<div class="nt">' + esc(i.title) + "</div>" +
+        (i.snippet ? '<div class="nsnip">' + esc(i.snippet) + "</div>" : "") +
+        '<div class="nrow"><span class="nsrc" style="color:' + i.color + ";background:" + i.color + '22">' +
+        esc(i.source) + "</span><span>" + esc(timeAgo(i.date)) + "</span></div></a>").join("")
+    : '<p class="news-head nmeta" style="padding:20px 4px">' +
+      (newsLoading ? "Fetching climate news\u2026" : "No news loaded yet \u2014 hit Refresh news.") + "</p>";
+}
+
+// ---------------------------------------------------------------
+// Wiring
+// ---------------------------------------------------------------
+document.getElementById("btnRefresh").addEventListener("click", fetchAll);
+document.getElementById("btnNewsRefresh").addEventListener("click", () => {
+  newsUpdatedAt = null; // force refetch
+  fetchNews();
+});
+document.getElementById("tabs").addEventListener("click", e => {
+  const t = e.target.closest("[data-tab]");
+  if (t) {
+    activeTab = t.dataset.tab;
+    render();
+    if (activeTab === "News" && newsStale()) fetchNews();
+  }
+});
+document.getElementById("newsChips").addEventListener("click", e => {
+  const c = e.target.closest("[data-src]");
+  if (c) { newsFilter = c.dataset.src; renderNews(); }
+});
+
+// load cached data instantly, then refresh
+try {
+  const c = JSON.parse(localStorage.getItem(CACHE_KEY));
+  if (c && c.quotes) { quotes = c.quotes; indexData = computeIndex(quotes); }
+} catch (e) {}
+try {
+  const n = JSON.parse(localStorage.getItem(NEWS_KEY));
+  if (n && n.items && n.items.length) {
+    newsItems = n.items;
+    newsUpdatedAt = new Date(n.ts || Date.now());
+  }
+} catch (e) {}
+render();
+fetchAll();
+timer = setInterval(fetchAll, 300000);
+// refresh news only while the News tab is open and the cache is stale
+setInterval(() => {
+  if (activeTab === "News" && newsStale() && !newsLoading) fetchNews();
+}, 60000);
+</script>
+</body>
+</html>
