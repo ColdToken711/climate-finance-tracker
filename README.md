@@ -32,7 +32,8 @@ Every stock is tagged **PURE-PLAY**, **MAJOR** or **TRACKER** — the difference
 
 ## Features
 
-- **Live quote cards** — price, day change, and a real 1-month sparkline of daily closes per stock, grouped in tabs. Prices are shown in each stock's own currency: €, $, ¥, kr, CHF, £ (pence), Kč, ₩, HK$.
+- **Live quote cards** — price, day change, and a real sparkline per stock, grouped in tabs. Prices are shown in each stock's own currency: €, $, ¥, kr, CHF, £ (pence), Kč, ₩, HK$.
+- **Timeframe switcher (1M / 1W / 1D)** — a segmented control in the header switches every sparkline, the index chart and the index stat between one month of daily closes, one week of 15-minute bars, and one day of 5-minute bars. Day change is always measured against yesterday's official close (not the last bar), and 1D charts anchor their line at yesterday's close so overnight gaps stay visible — a stock that gaps up 30% at the open shows the gap, not just the fade. Each timeframe has its own cache, and switching mid-refresh is safe: the in-flight fetch for the old timeframe silently discards itself.
 - **Climate Transition Index** — a market-cap-weighted basket of the 83 stocks (ETFs excluded), plotted against an equal-weighted version of the same basket. The gap between the two lines shows whether the transition trade is concentrated in the giants or broadening out. (Headline finding: Tesla alone is ~32% of the cap-weighted index — the equal-weight line is the counterweight.)
 - **News feed** — a 📰 News tab merging five RSS sources: Carbon Brief, Climate Home News, The Guardian (environment), CleanTechnica and PV Magazine. Deduplicated, newest-first, with per-source filter chips.
 - **Resilient data fetching** — quotes are batched into multi-symbol requests (7 requests for 91 names) and fetched through a proxy chain (allorigins → codetabs → r.jina.ai) with automatic failover, dead-proxy cooldowns and per-symbol retry. The app kept working through a full-day outage of the primary proxy on 13 Nov 2026.
@@ -44,13 +45,13 @@ Every stock is tagged **PURE-PLAY**, **MAJOR** or **TRACKER** — the difference
 
 **Currencies.** The spark endpoint doesn't return a currency, so it's derived from each ticker's exchange suffix (`.MC` → EUR, `.SW` → CHF, `.SZ` → CNY, `.L` → GB pence, …). London-listed prices display as pence; market-cap weights are converted to EUR.
 
-**Index methodology.** Each stock is normalized to its first daily close in the 1-month window, forward-filled to the union of trading days, then blended:
+**Index methodology.** Each stock is normalized to its first close in the active window (1M, 1W or 1D), forward-filled to the union of timestamps across exchanges, then blended:
 
 ```
 index_level = Σ  weightᵢ × (priceᵢ / base_priceᵢ)
 ```
 
-Cap weights are market caps in EUR (as of 13 Nov 2026, baked in at build time); the index starts at 1.0, so the level reads directly as "the basket is up X% over the last month." The equal-weight line applies `weightᵢ = 1/n`.
+Cap weights are market caps in EUR (as of 13 Nov 2026, baked in at build time); the index starts at 1.0, so the level reads directly as "the basket is up X% over the active window." The equal-weight line applies `weightᵢ = 1/n`.
 
 **News.** RSS feeds fetched through the same proxy chain. When the request lands on the r.jina.ai reader (which renders feeds as markdown), a second parser handles that format — one code path per proxy type. Refreshes at most every 30 minutes.
 
@@ -58,7 +59,8 @@ Cap weights are market caps in EUR (as of 13 Nov 2026, baked in at build time); 
 
 | Key | Contents |
 | --- | --- |
-| `climate_cache_v1` | per-symbol quotes + 1-month history (survives restarts) |
+| `climate_cache_v1_1M` / `_1W` / `_1D` | per-symbol quotes + history per timeframe (survives restarts) |
+| `climate_tf` | active timeframe preference |
 | `climate_news_v1` | cached news items |
 
 ## Disclaimer

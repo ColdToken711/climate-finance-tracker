@@ -20,6 +20,9 @@
   .badge { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1px solid; letter-spacing: 0.05em; }
   .badge.live { color: var(--up); background: rgba(52,211,153,.12); border-color: rgba(52,211,153,.3); }
   .badge.wait { color: var(--dim); background: rgba(100,116,139,.12); border-color: rgba(100,116,139,.3); }
+  .tfbox { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .tfbox .tfbtn { border: none; border-radius: 0; padding: 6px 12px; background: transparent; color: var(--muted); }
+  .tfbox .tfbtn.active { background: var(--accent); color: #fff; }
   button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); color: var(--muted); padding: 6px 12px; font-size: 13px; }
   button:hover { color: #fff; border-color: #475569; }
   button:disabled { opacity: .5; cursor: default; }
@@ -91,6 +94,7 @@
     </div>
     <div class="actions">
       <span class="badge wait" id="badge">WAIT</span>
+      <span class="tfbox" id="tfbox"></span>
       <button id="btnRefresh">Refresh now</button>
     </div>
   </div>
@@ -346,6 +350,19 @@ const MCAPS = {
   "STEM": 20,
 };
 const CACHE_KEY = "climate_cache_v1";
+const TIMEFRAMES = {
+  "1M": { range: "1mo", interval: "1d", cap: "1-month \u00b7 daily closes" },
+  "1W": { range: "5d", interval: "15m", cap: "1-week \u00b7 15-min bars" },
+  "1D": { range: "1d", interval: "5m", cap: "1-day \u00b7 5-min bars" },
+};
+const cacheKeyFor = t => CACHE_KEY + "_" + t;
+function loadCache(t) {
+  try {
+    const c = JSON.parse(localStorage.getItem(cacheKeyFor(t)));
+    if (c && c.quotes) return c.quotes;
+  } catch (e) {}
+  return {};
+}
 const sleep = ms => new Promise(res => setTimeout(res, ms));
 
 // ---------------------------------------------------------------
@@ -358,6 +375,8 @@ let loading = false;
 let lastUpdated = null;
 let failedSymbols = [];
 let timer = null;
+let tf = "1M";        // active timeframe: 1M | 1W | 1D
+let fetchGen = 0;    // refresh generation: stale fetches can't write
 
 // ---------------------------------------------------------------
 // Yahoo Finance (unofficial) via public CORS proxies, no API key.
@@ -411,9 +430,10 @@ async function proxyFetch(url, kind) {
   throw lastErr || new Error("all proxies failed");
 }
 
-async function fetchOne(sym) {
+async function fetchOne(sym, t) {
+  const cfg = TIMEFRAMES[t];
   const target = "https://query1.finance.yahoo.com/v8/finance/chart/" +
-    encodeURIComponent(sym) + "?range=1mo&interval=1d";
+    encodeURIComponent(sym) + "?range=" + cfg.range + "&interval=" + cfg.interval;
   const text = await proxyFetch(target, "quotes");
   const j = parseJsonLoose(text);
   const res = j && j.chart && j.chart.result && j.chart.result[0];
@@ -426,7 +446,17 @@ async function fetchOne(sym) {
   ts.forEach((t, i) => { if (closes[i] != null) hist.push({ t, p: closes[i] }); });
   const price = m.regularMarketPrice;
   if (!price || !hist.length) throw new Error("empty");
-  const prev = hist.length >= 2 ? hist[hist.length - 2].p : (m.chartPreviousClose || hist[0].p);
+  // day change vs previous close; on intraday TFs the last bar is ~now,
+  // so prefer Yahoo's own previousClose fields
+  const prev = m.previousClose != null ? m.previousClose
+    : (t === "1M" && hist.length >= 2) ? hist[hist.length - 2].p
+    : (m.chartPreviousClose || hist[0].p);
+  // anchor the 1D line at yesterday's close: a gap-up would otherwise
+  // be invisible (day's bars only), making the chart contradict the
+  // day change \u2014 e.g. a +27% card next to a falling intraday line
+  if (t === "1D" && prev != null && hist.length) {
+    hist.unshift({ t: hist[0].t - 60, p: prev });
+  }
   return {
     c: price,
     prev: prev,
@@ -464,9 +494,10 @@ function symCurrency(s) {
 // 91 single-symbol requests. Yahoo rejects chunks much larger than
 // that (HTTP 400), so keep SPARK_CHUNK at 15.
 const SPARK_CHUNK = 15;
-async function fetchSparkChunk(symbols) {
+async function fetchSparkChunk(symbols, t) {
+  const cfg = TIMEFRAMES[t];
   const target = "https://query1.finance.yahoo.com/v8/finance/spark?symbols=" +
-    symbols.map(encodeURIComponent).join(",") + "&range=1mo&interval=1d";
+    symbols.map(encodeURIComponent).join(",") + "&range=" + cfg.range + "&interval=" + cfg.interval;
   const text = await proxyFetch(target, "quotes");
   const j = parseJsonLoose(text);
   const out = {};
@@ -477,10 +508,18 @@ async function fetchSparkChunk(symbols) {
     (r.timestamp || []).forEach((t, i) => { if (r.close[i] != null) hist.push({ t, p: r.close[i] }); });
     if (hist.length < 2) return;
     const price = r.fulldayPrice != null ? r.fulldayPrice : hist[hist.length - 1].p;
-    const prev = hist[hist.length - 2].p;
+    const prev = r.previousClose != null ? r.previousClose : hist[hist.length - 2].p;
+    const dp = r.fulldayChangePercent != null ? r.fulldayChangePercent : (price - prev) / prev * 100;
+    const d = r.fulldayChange != null ? r.fulldayChange : price - prev;
+    // anchor the 1D line at yesterday's close: a gap-up would otherwise
+    // be invisible (day's bars only), making the chart contradict the
+    // day change \u2014 e.g. a +27% card next to a falling intraday line
+    if (t === "1D" && r.previousClose != null) {
+      hist.unshift({ t: hist[0].t - 60, p: r.previousClose });
+    }
     out[s] = {
       c: price, prev: prev,
-      dp: (price - prev) / prev * 100, d: price - prev,
+      dp: dp, d: d,
       cur: (quotes[s] && quotes[s].cur) || symCurrency(s),
       hist: hist,
     };
@@ -488,11 +527,12 @@ async function fetchSparkChunk(symbols) {
   return out;
 }
 
-async function fetchBatched(symbols, into, failed) {
+async function fetchBatched(symbols, into, failed, gen) {
   const CHUNK = 6;
   for (let i = 0; i < symbols.length; i += CHUNK) {
     const batch = symbols.slice(i, i + CHUNK);
-    const results = await Promise.allSettled(batch.map(s => fetchOne(s)));
+    const results = await Promise.allSettled(batch.map(s => fetchOne(s, tf)));
+    if (gen !== fetchGen) return; // superseded mid-retry
     results.forEach((res, j) => {
       if (res.status === "fulfilled") into[batch[j]] = res.value;
       else failed.push(batch[j]);
@@ -504,7 +544,8 @@ async function fetchBatched(symbols, into, failed) {
 }
 
 async function fetchAll() {
-  if (loading) return;
+  const gen = ++fetchGen; // each refresh gets a generation; a newer
+  const t = tf;           // one (e.g. a timeframe switch) supersedes it
   loading = true;
   document.getElementById("btnRefresh").disabled = true;
   document.getElementById("btnRefresh").textContent = "Refreshing\u2026";
@@ -512,13 +553,14 @@ async function fetchAll() {
   failedSymbols = [];
   const next = {};
   const failed = [];
-  // fast path: multi-symbol spark API — 7 requests for 91 names
+  // fast path: multi-symbol spark API \u2014 7 requests for 91 names
   // instead of 91 requests (much gentler on the free proxies)
   for (let i = 0; i < SYMBOLS.length; i += SPARK_CHUNK) {
     const chunk = SYMBOLS.slice(i, i + SPARK_CHUNK);
     try {
-      Object.assign(next, await fetchSparkChunk(chunk));
-    } catch (e) { /* whole chunk failed — retried below */ }
+      Object.assign(next, await fetchSparkChunk(chunk, t));
+    } catch (e) { /* whole chunk failed \u2014 retried below */ }
+    if (gen !== fetchGen) return; // timeframe switched mid-flight
     chunk.forEach(s => { if (!next[s]) failed.push(s); });
     quotes = next;
     render();
@@ -528,8 +570,11 @@ async function fetchAll() {
   // better per-symbol errors)
   if (failed.length) {
     await sleep(2500);
-    await fetchBatched(failed, next, failedSymbols = []);
+    if (gen !== fetchGen) return;
+    failedSymbols = [];
+    await fetchBatched(failed, next, failedSymbols, gen);
   }
+  if (gen !== fetchGen) return;
   if (Object.keys(next).length === 0) {
     showError("Couldn't reach Yahoo Finance \u2014 the CORS proxy chain (allorigins / codetabs / jina) is down or rate-limiting. " +
       "Wait a minute and hit Refresh now; cached data is still shown.");
@@ -537,7 +582,7 @@ async function fetchAll() {
     quotes = next;
     failedSymbols = SYMBOLS.filter(s => !next[s]);
     indexData = computeIndex(next);
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), quotes: next })); } catch (e) {}
+    try { localStorage.setItem(cacheKeyFor(t), JSON.stringify({ ts: Date.now(), quotes: next })); } catch (e) {}
     lastUpdated = new Date();
   }
   loading = false;
@@ -669,10 +714,14 @@ function stat(label, value, tone) {
 function render() {
   const n = SYMBOLS.length;
   document.getElementById("subtitle").innerHTML =
-    n + " climate-transition names across Europe, China and the US \u00b7 live prices &amp; 1-month trends via Yahoo Finance \u00b7 no API key needed \u00b7 refreshes every 5 min";
+    n + " climate-transition names across Europe, China and the US \u00b7 live prices &amp; trends via Yahoo Finance \u00b7 no API key needed \u00b7 refreshes every 5 min";
   const badge = document.getElementById("badge");
   badge.textContent = lastUpdated ? "LIVE" : (Object.keys(quotes).length ? "CACHED" : "WAIT");
   badge.className = "badge " + (lastUpdated ? "live" : "wait");
+  document.getElementById("tfbox").innerHTML =
+    Object.keys(TIMEFRAMES).map(t =>
+      '<button class="tfbtn' + (t === tf ? " active" : "") + '" data-tf="' + t + '">' + t + "</button>"
+    ).join("");
 
   // stats
   const qs = Object.values(quotes).filter(q => q.dp !== undefined);
@@ -690,7 +739,7 @@ function render() {
     idxTone = chg >= 0 ? "up" : "down";
   }
   document.getElementById("stats").innerHTML =
-    stat("Index (1M)", idxStr, idxTone) +
+    stat("Index (" + tf + ")", idxStr, idxTone) +
     stat("Avg day change", avg, avg.startsWith("+") ? "up" : "down") +
     stat("Best", best, "up") +
     stat("Worst", worst, "down");
@@ -705,7 +754,7 @@ function render() {
     const dayCap = cap.length > 1 ? (cap[cap.length - 1].v / cap[cap.length - 2].v - 1) * 100 : 0;
     document.getElementById("idxValue").textContent = cap[cap.length - 1].v.toFixed(4);
     document.getElementById("idxSub").innerHTML =
-      "1M: <b class='" + (chg >= 0 ? "up" : "down") + "'>" + fmt(chg, 2) + "%</b> (cap-weighted) vs " +
+      tf + ": <b class='" + (chg >= 0 ? "up" : "down") + "'>" + fmt(chg, 2) + "%</b> (cap-weighted) vs " +
       fmt(eqChg, 2) + "% (equal-weighted) \u00b7 today " + fmt(dayCap, 2) + "%" +
       " \u00b7 " + indexData.n + " stocks \u00b7 ETFs excluded \u00b7 weights as of 13 Nov 2026";
     drawMulti(document.getElementById("idxChart"), [
@@ -738,7 +787,7 @@ function render() {
       '<div class="abs">' + (q ? fmt(q.d, 2) + " today" : "") + "</div></div></div>" +
       (q && q.hist.length > 1
         ? '<canvas data-sym="' + esc(x.s) + '"></canvas>' +
-          '<div class="trendcap">1-month trend \u00b7 daily closes</div>'
+          '<div class="trendcap">' + TIMEFRAMES[tf].cap + '</div>'
         : "") +
       "</div>";
   }).join("");
@@ -906,7 +955,27 @@ function renderNews() {
 // ---------------------------------------------------------------
 // Wiring
 // ---------------------------------------------------------------
+// timeframe switching: show cached data for the new tf immediately,
+// then fetch fresh. fetchAll uses generations, so an in-flight
+// refresh for the old timeframe silently discards itself.
+function setTf(t) {
+  if (!TIMEFRAMES[t] || t === tf) return;
+  tf = t;
+  try { localStorage.setItem("climate_tf", t); } catch (e) {}
+  quotes = loadCache(t);
+  indexData = Object.keys(quotes).length ? computeIndex(quotes) : null;
+  lastUpdated = null;
+  showError(null);
+  failedSymbols = [];
+  render();
+  fetchAll();
+}
+
 document.getElementById("btnRefresh").addEventListener("click", fetchAll);
+document.getElementById("tfbox").addEventListener("click", e => {
+  const b = e.target.closest("[data-tf]");
+  if (b) setTf(b.dataset.tf);
+});
 document.getElementById("btnNewsRefresh").addEventListener("click", () => {
   newsUpdatedAt = null; // force refetch
   fetchNews();
@@ -924,9 +993,19 @@ document.getElementById("newsChips").addEventListener("click", e => {
   if (c) { newsFilter = c.dataset.src; renderNews(); }
 });
 
-// load cached data instantly, then refresh
+// load cached data instantly, then refresh (per-timeframe caches;
+// also migrate any pre-switcher cache under the bare v1 key to 1M)
 try {
-  const c = JSON.parse(localStorage.getItem(CACHE_KEY));
+  const t = localStorage.getItem("climate_tf");
+  if (TIMEFRAMES[t]) tf = t;
+  let c = null;
+  try { c = JSON.parse(localStorage.getItem(cacheKeyFor(tf))); } catch (e) {}
+  if (!c || !c.quotes) {
+    try { c = JSON.parse(localStorage.getItem(CACHE_KEY)); } catch (e) {}
+    if (c && c.quotes && tf === "1M") {
+      try { localStorage.setItem(cacheKeyFor("1M"), JSON.stringify({ ts: c.ts || Date.now(), quotes: c.quotes })); } catch (e) {}
+    } else c = null;
+  }
   if (c && c.quotes) { quotes = c.quotes; indexData = computeIndex(quotes); }
 } catch (e) {}
 try {
