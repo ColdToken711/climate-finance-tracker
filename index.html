@@ -605,12 +605,17 @@ function computeIndex(q) {
   const dates = [...datesSet].sort((a, b) => a - b);
   const cap = [], eq = [];
   const lastSeen = {};
+  // Seed every stock at its base price: until it has a datapoint in the
+  // window, it counts at ratio 1.0 (held where it started). Without this,
+  // the basket only fills up as regional markets open \u2014 Asia, then Europe,
+  // then the US \u2014 and the index line draws fake staircase steps whenever
+  // a block of market cap joins mid-window.
+  syms.forEach(s => { lastSeen[s] = q[s].hist[0].p; });
   for (const t of dates) {
     let capV = 0, eqV = 0;
     for (const s of syms) {
       const h = q[s].hist.find(x => x.t === t);
       if (h) lastSeen[s] = h.p;
-      if (lastSeen[s] == null) continue;
       const base = q[s].hist[0].p;
       const r = lastSeen[s] / base;
       capV += (MCAPS[s] / capSum) * r;

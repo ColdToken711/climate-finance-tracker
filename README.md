@@ -51,7 +51,7 @@ Every stock is tagged **PURE-PLAY**, **MAJOR** or **TRACKER** — the difference
 index_level = Σ  weightᵢ × (priceᵢ / base_priceᵢ)
 ```
 
-Cap weights are market caps in EUR (as of 13 Nov 2026, baked in at build time); the index starts at 1.0, so the level reads directly as "the basket is up X% over the active window." The equal-weight line applies `weightᵢ = 1/n`.
+Cap weights are market caps in EUR (as of 13 Nov 2026, baked in at build time); the index starts at 1.0, so the level reads directly as "the basket is up X% over the active window." Stocks that haven't traded yet in the window — Asian markets open first, then Europe, then the US — are held at their base price rather than excluded, so the basket is complete from the very first point and the line doesn't draw fake staircase steps as each region's market cap joins. The equal-weight line applies `weightᵢ = 1/n`.
 
 **News.** RSS feeds fetched through the same proxy chain. When the request lands on the r.jina.ai reader (which renders feeds as markdown), a second parser handles that format — one code path per proxy type. Refreshes at most every 30 minutes.
 
