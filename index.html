@@ -98,7 +98,7 @@
     --line-cap: #39ff6e; --line-eq: #ffd94a; --line-base: #1e5c2e;
     --fill-up: rgba(57,255,110,.12); --fill-down: rgba(255,91,106,.12);
     --tip-bg: rgba(1,11,4,.95);
-    --tip-font: 15px "VT323", "Courier New", monospace;
+    --tip-font: 19px "VT323", "Courier New", monospace;
   }
   body.retro { font-family: "VT323", "Courier New", monospace; font-size: 17px; letter-spacing: .02em; text-shadow: 0 0 3px rgba(57,255,110,.14); }
   body.retro::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 999; background: repeating-linear-gradient(0deg, rgba(0,0,0,.09) 0 1px, transparent 1px 4px); }
@@ -819,14 +819,15 @@ function drawMulti(cv, series, hoverI) {
       ctx.fillStyle = s.color; ctx.fill();
       ctx.strokeStyle = chartC.ring; ctx.lineWidth = 1.5; ctx.stroke();
     });
-    // tooltip box
+    // tooltip box — line spacing must scale with the (theme-dependent) font
     ctx.font = chartC.tipFont;
+    const lineH = retro ? 23 : 15;
     const lines = [fmtTs(base[i].t)];
     series.forEach((s, k) => {
       lines.push((s.label || "line " + (k + 1)) + ": " + fmt((s.data[i].v - 1) * 100, 2) + "%");
     });
-    const tw = Math.max.apply(null, lines.map(l => ctx.measureText(l).width)) + 28;
-    const th = lines.length * 15 + 12;
+    const tw = Math.max.apply(null, lines.map(l => ctx.measureText(l).width)) + (retro ? 34 : 28);
+    const th = lines.length * lineH + 16;
     let bx = hx + 12; if (bx + tw > w - 4) bx = hx - tw - 12;
     if (bx < 4) bx = 4;
     const by = 6;
@@ -840,10 +841,10 @@ function drawMulti(cv, series, hoverI) {
     ctx.lineTo(bx, by + r); ctx.arcTo(bx, by, bx + r, by, r);
     ctx.closePath(); ctx.fill(); ctx.stroke();
     lines.forEach((l, k) => {
-      const ly = by + 14 + k * 15;
+      const ly = by + 16 + k * lineH;
       if (k > 0) { // colored bullet for each series line
         ctx.beginPath();
-        ctx.arc(bx + 10, ly - 4, 3, 0, Math.PI * 2);
+        ctx.arc(bx + (retro ? 12 : 10), ly - 6, retro ? 4 : 3, 0, Math.PI * 2);
         ctx.fillStyle = series[k - 1].color; ctx.fill();
       }
       ctx.fillStyle = k === 0 ? chartC.tipMuted : chartC.tipText;
