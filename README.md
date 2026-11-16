@@ -2,7 +2,7 @@
 
 A self-contained, single-file web app that tracks the **climate transition as an investment theme** — 91 names across Europe, China and the US, from Iberdrola and Siemens Energy to BYD and CATL, plus a news feed of the most important climate-sector stories.
 
-No build step. No dependencies. No backend. **No API key** — one HTML file and your browser.
+No build step. No dependencies. No backend. **No API key** — one HTML file and your browser. (The only external asset is the optional pixel-font stylesheet used by the retro theme; the app works fine without it.)
 
 ## Quick start
 
@@ -35,6 +35,8 @@ Every stock is tagged **PURE-PLAY**, **MAJOR** or **TRACKER** — the difference
 - **Live quote cards** — price, day change, and a real sparkline per stock, grouped in tabs. Prices are shown in each stock's own currency: €, $, ¥, kr, CHF, £ (pence), Kč, ₩, HK$.
 - **Timeframe switcher (1M / 1W / 1D)** — a segmented control in the header switches every sparkline, the index chart and the index stat between one month of daily closes, one week of 15-minute bars, and one day of 5-minute bars. Day change is always measured against yesterday's official close (not the last bar), and 1D charts anchor their line at yesterday's close so overnight gaps stay visible — a stock that gaps up 30% at the open shows the gap, not just the fade. Each timeframe has its own cache, and switching mid-refresh is safe: the in-flight fetch for the old timeframe silently discards itself.
 - **Chart hover** — move the cursor over any chart to read exact values: the index chart shows a crosshair with the date/time and the % of both index lines, and each stock sparkline shows price + time in its caption.
+- **News ticker** — the 20 newest headlines scroll continuously across a bar pinned to the top of the page, with a colored dot per source. Hovering pauses the scroll, clicking a headline opens the story, and the feed refreshes itself every 30 minutes.
+- **Retro CRT layout** — a `RETRO` toggle in the header switches the whole app into an 80s/90s green-phosphor terminal: Press Start 2P headers, VT323 body text, chunky square borders, scanlines and a soft CRT glow. The charts re-skin too — they render at half resolution and upscale pixelated, so even the lines look chunky. Your choice is remembered; the pixel fonts load from Google Fonts and fall back to monospace offline.
 - **Climate Transition Index** — a market-cap-weighted basket of the 83 stocks (ETFs excluded), plotted against an equal-weighted version of the same basket. The gap between the two lines shows whether the transition trade is concentrated in the giants or broadening out. (Headline finding: Tesla alone is ~32% of the cap-weighted index — the equal-weight line is the counterweight.)
 - **News feed** — a 📰 News tab merging five RSS sources: Carbon Brief, Climate Home News, The Guardian (environment), CleanTechnica and PV Magazine. Deduplicated, newest-first, with per-source filter chips.
 - **Resilient data fetching** — quotes are batched into multi-symbol requests (7 requests for 91 names) and fetched through a proxy chain (allorigins → codetabs → r.jina.ai) with automatic failover, dead-proxy cooldowns and per-symbol retry. The app kept working through a full-day outage of the primary proxy on 13 Nov 2026.

@@ -4,11 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Climate Transition Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- pixel fonts for the retro CRT theme; falls back to monospace offline -->
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&amp;family=VT323&amp;display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #020617; --panel: #0f172a; --border: #1e293b;
     --text: #f1f5f9; --muted: #94a3b8; --dim: #64748b;
     --up: #34d399; --down: #fb7185; --accent: #10b981; --sky: #38bdf8; --amber: #f59e0b;
+    /* chart colors live in CSS variables so the canvas layer re-skins with the theme */
+    --line-cap: #38bdf8; --line-eq: #f59e0b; --line-base: #334155;
+    --fill-up: rgba(52,211,153,.10); --fill-down: rgba(251,113,133,.10);
+    --tip-bg: rgba(2,6,23,.94);
+    --tip-font: 11px ui-sans-serif, system-ui, sans-serif;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding: 16px; }
@@ -67,6 +76,63 @@
   .stock .trendcap { font-size: 10px; color: #475569; margin-top: 2px; }
   .up { color: var(--up); } .down { color: var(--down); }
   .footer { color: var(--dim); font-size: 12px; margin-top: 20px; line-height: 1.6; }
+  /* News ticker */
+  #ticker { position: sticky; top: 0; z-index: 40; display: flex; align-items: stretch; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
+  #ticker .tlabel { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; font-size: 10px; font-weight: 700; letter-spacing: .12em; color: var(--up); padding: 8px 12px; border-right: 1px solid var(--border); text-transform: uppercase; white-space: nowrap; }
+  #ticker .tview { flex: 1 1 auto; overflow: hidden; }
+  #ticker .track { display: inline-flex; white-space: nowrap; align-items: center; will-change: transform; animation: tickmove 60s linear infinite; }
+  #ticker:hover .track { animation-play-state: paused; }
+  @keyframes tickmove { to { transform: translateX(-50%); } }
+  .thalf { display: inline-flex; align-items: center; }
+  a.titem { display: inline-flex; align-items: center; gap: 7px; padding: 8px 0; color: var(--text); text-decoration: none; font-size: 13px; }
+  a.titem:hover { color: var(--sky); }
+  a.titem .tdot { width: 7px; height: 7px; border-radius: 999px; flex: 0 0 auto; }
+  .tsep { padding: 0 16px; color: var(--dim); font-size: 11px; flex: 0 0 auto; }
+  .tsep::after { content: "\2022"; }
+
+  /* ============ RETRO THEME: 80s/90s green-phosphor CRT ============ */
+  body.retro {
+    --bg: #010b04; --panel: #031a0b; --border: #1e5c2e;
+    --text: #baffc9; --muted: #63d47c; --dim: #2f9c50;
+    --up: #39ff6e; --down: #ff5b6a; --accent: #39ff6e; --sky: #7dffc4; --amber: #ffd94a;
+    --line-cap: #39ff6e; --line-eq: #ffd94a; --line-base: #1e5c2e;
+    --fill-up: rgba(57,255,110,.12); --fill-down: rgba(255,91,106,.12);
+    --tip-bg: rgba(1,11,4,.95);
+    --tip-font: 13px "VT323", "Courier New", monospace;
+  }
+  body.retro { font-family: "VT323", "Courier New", monospace; font-size: 16px; letter-spacing: .02em; text-shadow: 0 0 4px rgba(57,255,110,.18); }
+  body.retro::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 999; background: repeating-linear-gradient(0deg, rgba(0,0,0,.20) 0 1px, transparent 1px 3px); }
+  body.retro::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 998; background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.38) 100%); }
+  body.retro canvas { image-rendering: pixelated; }
+  body.retro h1 { font-family: "Press Start 2P", "VT323", monospace; font-size: 15px; letter-spacing: 0; text-shadow: 0 0 9px rgba(57,255,110,.55); }
+  body.retro .sub { font-size: 15px; }
+  body.retro .card { border-radius: 0; border-width: 2px; box-shadow: 4px 4px 0 rgba(0,0,0,.55); }
+  body.retro button, body.retro .tfbox, body.retro .chip, body.retro .badge, body.retro .tabs { border-radius: 0; }
+  body.retro button { border-width: 2px; font-size: 15px; box-shadow: 2px 2px 0 rgba(0,0,0,.55); text-transform: uppercase; }
+  body.retro button:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 rgba(0,0,0,.55); }
+  body.retro .badge { font-family: "Press Start 2P", "VT323", monospace; font-size: 8px; letter-spacing: 0; }
+  body.retro .tfbtn { font-size: 15px; }
+  body.retro .tfbtn.active, body.retro .tab.active, body.retro .chip.on { color: #012b0e; }
+  body.retro .stat .label, body.retro .idx .label { font-family: "Press Start 2P", "VT323", monospace; font-size: 8px; letter-spacing: .06em; }
+  body.retro .stat .value, body.retro .idx .ival { text-shadow: 0 0 7px currentColor; }
+  body.retro .stock:hover { border-color: var(--up); }
+  body.retro .stock .sym { text-shadow: 0 0 6px currentColor; }
+  body.retro .stock .name { font-size: 13px; }
+  body.retro .stock .trendcap, body.retro .idx .isub { font-size: 13px; }
+  body.retro .tag { border-radius: 0; }
+  body.retro .legend .dot { border-radius: 0; }
+  body.retro .footer { font-size: 14px; }
+  body.retro #ticker { border-radius: 0; border-width: 2px; }
+  body.retro #ticker .tlabel { font-family: "Press Start 2P", "VT323", monospace; font-size: 8px; letter-spacing: 0; }
+  body.retro a.titem { font-size: 15px; }
+  body.retro .tsep::after { content: "+++"; }
+  body.retro .tab { font-size: 15px; text-transform: uppercase; }
+  body.retro .chip { font-size: 14px; }
+  body.retro .news-head h2 { font-family: "Press Start 2P", "VT323", monospace; font-size: 13px; }
+  body.retro .news-item .nt { font-size: 16px; }
+  body.retro .news-item .nsnip { font-size: 14px; }
+  body.retro .news-item .nrow { font-size: 13px; }
+  body.retro .nsrc { border-radius: 0; font-size: 12px; }
   @media (max-width: 640px) { .stats { grid-template-columns: repeat(2, 1fr); } }
 
   /* News feed */
@@ -87,6 +153,10 @@
 </head>
 <body>
 <div class="wrap">
+  <div id="ticker">
+    <span class="tlabel">&#9612; Live news</span>
+    <div class="tview"><div class="track" id="tickerTrack"></div></div>
+  </div>
   <div class="flex">
     <div>
       <h1>Climate Transition Tracker</h1>
@@ -95,6 +165,7 @@
     <div class="actions">
       <span class="badge wait" id="badge">WAIT</span>
       <span class="tfbox" id="tfbox"></span>
+      <button id="btnTheme" title="Switch between the modern layout and the retro CRT one">RETRO: OFF</button>
       <button id="btnRefresh">Refresh now</button>
     </div>
   </div>
@@ -111,9 +182,9 @@
         <div class="isub" id="idxSub"></div>
       </div>
       <div class="legend">
-        <span class="k"><span class="dot" style="background:#38bdf8"></span>cap-weighted</span>
-        <span class="k"><span class="dot" style="background:#f59e0b"></span>equal-weighted</span>
-        <span class="k"><span class="dot" style="background:#334155"></span>baseline 1.0 (1 month ago)</span>
+        <span class="k"><span class="dot" style="background:var(--line-cap)"></span>cap-weighted</span>
+        <span class="k"><span class="dot" style="background:var(--line-eq)"></span>equal-weighted</span>
+        <span class="k"><span class="dot" style="background:var(--line-base)"></span>baseline 1.0 (1 month ago)</span>
       </div>
     </div>
     <canvas id="idxChart"></canvas>
@@ -630,23 +701,52 @@ function computeIndex(q) {
 // ---------------------------------------------------------------
 // Charts (Canvas 2D, no dependencies)
 // ---------------------------------------------------------------
+// Theme system: chart colors are read from CSS variables, so the whole
+// canvas layer re-skins the moment body.retro is toggled. In retro mode
+// charts draw at HALF resolution and the browser upscales them with
+// image-rendering: pixelated — that's what makes the lines chunky.
+let chartC = null;
+const THEME_KEY = "climate_theme";
+function readChartColors() {
+  const cs = getComputedStyle(document.body);
+  const v = n => cs.getPropertyValue(n).trim();
+  chartC = {
+    up: v("--up"), down: v("--down"),
+    upFill: v("--fill-up"), downFill: v("--fill-down"),
+    cap: v("--line-cap"), eq: v("--line-eq"), base: v("--line-base"),
+    cross: v("--dim"), ring: v("--bg"),
+    tipBg: v("--tip-bg"), tipBorder: v("--border"),
+    tipText: v("--text"), tipMuted: v("--muted"), tipFont: v("--tip-font"),
+  };
+}
+function applyTheme(mode, rerender) {
+  const retro = mode === "retro";
+  document.body.classList.toggle("retro", retro);
+  readChartColors();
+  const b = document.getElementById("btnTheme");
+  if (b) b.textContent = retro ? "RETRO: ON" : "RETRO: OFF";
+  try { localStorage.setItem(THEME_KEY, retro ? "retro" : "modern"); } catch (e) {}
+  if (rerender) render();
+}
+
 function drawSpark(cv, data, up, hoverI) {
-  const dpr = window.devicePixelRatio || 1;
+  const retro = document.body.classList.contains("retro");
+  const scale = retro ? 0.5 : (window.devicePixelRatio || 1);
   const w = cv.clientWidth || 280, h = cv.clientHeight || 52;
-  cv.width = w * dpr; cv.height = h * dpr;
+  cv.width = Math.round(w * scale); cv.height = Math.round(h * scale);
   const ctx = cv.getContext("2d");
-  ctx.scale(dpr, dpr);
+  ctx.scale(scale, scale);
   const ps = data.map(d => d.p);
   const min = Math.min.apply(null, ps), max = Math.max.apply(null, ps);
   const span = (max - min) || 1;
   const X = i => (i / (data.length - 1)) * (w - 8) + 4;
   const Y = p => h - 6 - ((p - min) / span) * (h - 12);
-  const color = up ? "#34d399" : "#fb7185";
+  const color = up ? chartC.up : chartC.down;
   ctx.clearRect(0, 0, w, h);
   ctx.beginPath();
   data.forEach((d, i) => i ? ctx.lineTo(X(i), Y(d.p)) : ctx.moveTo(X(0), Y(d.p)));
   ctx.lineTo(X(data.length - 1), h); ctx.lineTo(X(0), h); ctx.closePath();
-  ctx.fillStyle = up ? "rgba(52,211,153,0.10)" : "rgba(251,113,133,0.10)";
+  ctx.fillStyle = up ? chartC.upFill : chartC.downFill;
   ctx.fill();
   ctx.beginPath();
   data.forEach((d, i) => i ? ctx.lineTo(X(i), Y(d.p)) : ctx.moveTo(X(0), Y(d.p)));
@@ -659,12 +759,12 @@ function drawSpark(cv, data, up, hoverI) {
     const i = Math.max(0, Math.min(data.length - 1, hoverI));
     ctx.setLineDash([3, 3]);
     ctx.beginPath(); ctx.moveTo(X(i), 2); ctx.lineTo(X(i), h - 2);
-    ctx.strokeStyle = "#64748b"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.strokeStyle = chartC.cross; ctx.lineWidth = 1; ctx.stroke();
     ctx.setLineDash([]);
     ctx.beginPath();
     ctx.arc(X(i), Y(data[i].p), 3.5, 0, Math.PI * 2);
     ctx.fillStyle = color; ctx.fill();
-    ctx.strokeStyle = "#0f172a"; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.strokeStyle = chartC.ring; ctx.lineWidth = 1.5; ctx.stroke();
   }
 }
 
@@ -672,11 +772,12 @@ function drawSpark(cv, data, up, hoverI) {
 let multiLast = null;
 
 function drawMulti(cv, series, hoverI) {
-  const dpr = window.devicePixelRatio || 1;
+  const retro = document.body.classList.contains("retro");
+  const scale = retro ? 0.5 : (window.devicePixelRatio || 1);
   const w = cv.clientWidth || 600, h = cv.clientHeight || 130;
-  cv.width = w * dpr; cv.height = h * dpr;
+  cv.width = Math.round(w * scale); cv.height = Math.round(h * scale);
   const ctx = cv.getContext("2d");
-  ctx.scale(dpr, dpr);
+  ctx.scale(scale, scale);
   let min = Infinity, max = -Infinity;
   series.forEach(s => s.data.forEach(d => { if (d.v < min) min = d.v; if (d.v > max) max = d.v; }));
   if (!isFinite(min) || series.some(s => s.data.length < 2)) return;
@@ -687,7 +788,7 @@ function drawMulti(cv, series, hoverI) {
   if (min <= 1 && max >= 1) {
     ctx.beginPath(); ctx.setLineDash([3, 4]);
     ctx.moveTo(0, Y(1)); ctx.lineTo(w, Y(1));
-    ctx.strokeStyle = "#334155"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.strokeStyle = chartC.base; ctx.lineWidth = 1; ctx.stroke();
     ctx.setLineDash([]);
   }
   series.forEach(s => {
@@ -706,17 +807,17 @@ function drawMulti(cv, series, hoverI) {
     const hx = X(base, i);
     ctx.setLineDash([3, 3]);
     ctx.beginPath(); ctx.moveTo(hx, 2); ctx.lineTo(hx, h - 2);
-    ctx.strokeStyle = "#64748b"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.strokeStyle = chartC.cross; ctx.lineWidth = 1; ctx.stroke();
     ctx.setLineDash([]);
     series.forEach(s => {
       const v = s.data[i].v;
       ctx.beginPath();
       ctx.arc(hx, Y(v), 4, 0, Math.PI * 2);
       ctx.fillStyle = s.color; ctx.fill();
-      ctx.strokeStyle = "#0f172a"; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.strokeStyle = chartC.ring; ctx.lineWidth = 1.5; ctx.stroke();
     });
     // tooltip box
-    ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
+    ctx.font = chartC.tipFont;
     const lines = [fmtTs(base[i].t)];
     series.forEach((s, k) => {
       lines.push((s.label || "line " + (k + 1)) + ": " + fmt((s.data[i].v - 1) * 100, 2) + "%");
@@ -726,8 +827,8 @@ function drawMulti(cv, series, hoverI) {
     let bx = hx + 12; if (bx + tw > w - 4) bx = hx - tw - 12;
     if (bx < 4) bx = 4;
     const by = 6;
-    ctx.fillStyle = "rgba(2,6,23,0.94)";
-    ctx.strokeStyle = "#334155"; ctx.lineWidth = 1;
+    ctx.fillStyle = chartC.tipBg;
+    ctx.strokeStyle = chartC.tipBorder; ctx.lineWidth = 1;
     ctx.beginPath();
     const r = 6, x2 = bx + tw, y2 = by + th;
     ctx.moveTo(bx + r, by); ctx.lineTo(x2 - r, by); ctx.arcTo(x2, by, x2, by + r, r);
@@ -742,7 +843,7 @@ function drawMulti(cv, series, hoverI) {
         ctx.arc(bx + 10, ly - 4, 3, 0, Math.PI * 2);
         ctx.fillStyle = series[k - 1].color; ctx.fill();
       }
-      ctx.fillStyle = k === 0 ? "#94a3b8" : "#e2e8f0";
+      ctx.fillStyle = k === 0 ? chartC.tipMuted : chartC.tipText;
       ctx.fillText(l, bx + (k > 0 ? 20 : 10), ly);
     });
   }
@@ -832,8 +933,8 @@ function render() {
       fmt(eqChg, 2) + "% (equal-weighted) \u00b7 today " + fmt(dayCap, 2) + "%" +
       " \u00b7 " + indexData.n + " stocks \u00b7 ETFs excluded \u00b7 weights as of 13 Nov 2026";
     drawMulti(document.getElementById("idxChart"), [
-      { data: cap, color: "#38bdf8", label: "cap-weighted" },
-      { data: eq, color: "#f59e0b", label: "equal-weighted" },
+      { data: cap, color: chartC.cap, label: "cap-weighted" },
+      { data: eq, color: chartC.eq, label: "equal-weighted" },
     ]);
   } else {
     panel.style.display = "none";
@@ -979,6 +1080,7 @@ async function fetchNews() {
   if (newsLoading) return;
   newsLoading = true;
   renderNews();
+  renderTicker();
   const collected = [];
   for (const f of NEWS_FEEDS) {
     try {
@@ -1000,6 +1102,7 @@ async function fetchNews() {
   }
   newsLoading = false;
   renderNews();
+  renderTicker();
 }
 
 function newsStale() {
@@ -1013,6 +1116,42 @@ function timeAgo(d) {
   if (s < 3600) return Math.floor(s / 60) + "m ago";
   if (s < 86400) return Math.floor(s / 3600) + "h ago";
   return Math.floor(s / 86400) + "d ago";
+}
+
+// ---------------------------------------------------------------
+// News ticker: the ~20 newest headlines scroll across the top bar.
+// The track holds two identical halves and translates by -50%,
+// which makes the loop seamless. Duration is set from the measured
+// half-width so the scroll speed stays constant no matter how many
+// headlines there are. Hovering pauses it; a click opens the story.
+// ---------------------------------------------------------------
+function renderTicker() {
+  const track = document.getElementById("tickerTrack");
+  if (!track) return;
+  const items = newsItems.slice(0, 20);
+  if (!items.length) {
+    track.style.animation = "none";
+    track.innerHTML =
+      '<span class="titem" style="padding-left:14px">' +
+      (newsLoading ? "Fetching climate news\u2026" : "No news loaded yet \u2014 open the News tab and hit Refresh news") +
+      "</span>";
+    return;
+  }
+  const html = items.map(it =>
+    '<a class="titem" href="' + esc(it.link) + '" target="_blank" rel="noopener noreferrer">' +
+    '<span class="tdot" style="background:' + esc(it.color) + '"></span>' +
+    esc(it.title) + "</a>" +
+    '<span class="tsep"></span>'
+  ).join("");
+  track.style.animation = "";
+  track.style.animationDuration = "60s";
+  track.innerHTML =
+    '<span class="thalf">' + html + "</span>" +
+    '<span class="thalf" aria-hidden="true">' + html + "</span>";
+  requestAnimationFrame(() => {
+    const half = track.firstChild ? track.firstChild.offsetWidth : 0;
+    if (half > 0) track.style.animationDuration = Math.max(25, Math.round(half / 55)) + "s";
+  });
 }
 
 function renderNews() {
@@ -1061,6 +1200,10 @@ function setTf(t) {
 }
 
 document.getElementById("btnRefresh").addEventListener("click", fetchAll);
+// layout theme: modern <-> retro CRT, persisted like the timeframe
+document.getElementById("btnTheme").addEventListener("click", () => {
+  applyTheme(document.body.classList.contains("retro") ? "modern" : "retro", true);
+});
 // index chart hover: crosshair + tooltip (canvas is static, so attach once)
 const idxCv = document.getElementById("idxChart");
 idxCv.addEventListener("mousemove", e => {
@@ -1114,12 +1257,18 @@ try {
     newsUpdatedAt = new Date(n.ts || Date.now());
   }
 } catch (e) {}
+// theme first, so the very first render already uses the right palette
+let savedTheme = "modern";
+try { if (localStorage.getItem(THEME_KEY) === "retro") savedTheme = "retro"; } catch (e) {}
+applyTheme(savedTheme, false);
 render();
+renderTicker();
 fetchAll();
+if (newsStale()) fetchNews(); // ticker shows news even without opening the News tab
 timer = setInterval(fetchAll, 300000);
-// refresh news only while the News tab is open and the cache is stale
+// news now lives in the always-visible ticker: keep it fresh (30-min TTL)
 setInterval(() => {
-  if (activeTab === "News" && newsStale() && !newsLoading) fetchNews();
+  if (newsStale() && !newsLoading) fetchNews();
 }, 60000);
 </script>
 </body>
