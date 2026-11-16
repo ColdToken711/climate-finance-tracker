@@ -775,8 +775,11 @@ function drawSpark(cv, data, up, hoverI) {
 let multiLast = null;
 
 function drawMulti(cv, series, hoverI) {
+  // index chart: retro renders at 0.75x (not 0.5x) — the tooltip text
+  // drawn here needs the extra resolution to stay readable; the mild
+  // upscale still looks chunky next to native HTML text
   const retro = document.body.classList.contains("retro");
-  const scale = retro ? 0.5 : (window.devicePixelRatio || 1);
+  const scale = retro ? 0.75 : (window.devicePixelRatio || 1);
   const w = cv.clientWidth || 600, h = cv.clientHeight || 130;
   cv.width = Math.round(w * scale); cv.height = Math.round(h * scale);
   const ctx = cv.getContext("2d");
