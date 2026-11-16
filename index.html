@@ -103,7 +103,6 @@
   body.retro { font-family: "VT323", "Courier New", monospace; font-size: 17px; letter-spacing: .02em; text-shadow: 0 0 3px rgba(57,255,110,.14); }
   body.retro::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 999; background: repeating-linear-gradient(0deg, rgba(0,0,0,.09) 0 1px, transparent 1px 4px); }
   body.retro::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 998; background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,.28) 100%); }
-  body.retro canvas { image-rendering: pixelated; }
   body.retro h1 { font-family: "Press Start 2P", "VT323", monospace; font-size: 15px; letter-spacing: 0; text-shadow: 0 0 9px rgba(57,255,110,.55); }
   body.retro .sub { font-size: 17px; }
   body.retro .card { border-radius: 0; border-width: 2px; box-shadow: 4px 4px 0 rgba(0,0,0,.55); }
@@ -705,9 +704,10 @@ function computeIndex(q) {
 // Charts (Canvas 2D, no dependencies)
 // ---------------------------------------------------------------
 // Theme system: chart colors are read from CSS variables, so the whole
-// canvas layer re-skins the moment body.retro is toggled. In retro mode
-// charts draw at HALF resolution and the browser upscales them with
-// image-rendering: pixelated — that's what makes the lines chunky.
+// canvas layer re-skins the moment body.retro is toggled. Charts render
+// at full resolution in both themes; the retro feel comes from the
+// palette, thicker lines and the CSS scanline overlay — not from
+// pixelating the canvas.
 let chartC = null;
 const THEME_KEY = "climate_theme";
 function readChartColors() {
@@ -734,7 +734,7 @@ function applyTheme(mode, rerender) {
 
 function drawSpark(cv, data, up, hoverI) {
   const retro = document.body.classList.contains("retro");
-  const scale = retro ? 0.5 : (window.devicePixelRatio || 1);
+  const scale = window.devicePixelRatio || 1;
   const w = cv.clientWidth || 280, h = cv.clientHeight || 52;
   cv.width = Math.round(w * scale); cv.height = Math.round(h * scale);
   const ctx = cv.getContext("2d");
@@ -775,11 +775,8 @@ function drawSpark(cv, data, up, hoverI) {
 let multiLast = null;
 
 function drawMulti(cv, series, hoverI) {
-  // index chart: retro renders at 0.75x (not 0.5x) — the tooltip text
-  // drawn here needs the extra resolution to stay readable; the mild
-  // upscale still looks chunky next to native HTML text
   const retro = document.body.classList.contains("retro");
-  const scale = retro ? 0.75 : (window.devicePixelRatio || 1);
+  const scale = window.devicePixelRatio || 1;
   const w = cv.clientWidth || 600, h = cv.clientHeight || 130;
   cv.width = Math.round(w * scale); cv.height = Math.round(h * scale);
   const ctx = cv.getContext("2d");
