@@ -93,46 +93,49 @@
   /* ============ RETRO THEME: 80s/90s green-phosphor CRT ============ */
   body.retro {
     --bg: #010b04; --panel: #031a0b; --border: #1e5c2e;
-    --text: #baffc9; --muted: #63d47c; --dim: #2f9c50;
+    --text: #ccffd8; --muted: #7ee08e; --dim: #45b568;
     --up: #39ff6e; --down: #ff5b6a; --accent: #39ff6e; --sky: #7dffc4; --amber: #ffd94a;
     --line-cap: #39ff6e; --line-eq: #ffd94a; --line-base: #1e5c2e;
     --fill-up: rgba(57,255,110,.12); --fill-down: rgba(255,91,106,.12);
     --tip-bg: rgba(1,11,4,.95);
-    --tip-font: 13px "VT323", "Courier New", monospace;
+    --tip-font: 15px "VT323", "Courier New", monospace;
   }
-  body.retro { font-family: "VT323", "Courier New", monospace; font-size: 16px; letter-spacing: .02em; text-shadow: 0 0 4px rgba(57,255,110,.18); }
-  body.retro::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 999; background: repeating-linear-gradient(0deg, rgba(0,0,0,.20) 0 1px, transparent 1px 3px); }
-  body.retro::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 998; background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.38) 100%); }
+  body.retro { font-family: "VT323", "Courier New", monospace; font-size: 17px; letter-spacing: .02em; text-shadow: 0 0 3px rgba(57,255,110,.14); }
+  body.retro::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 999; background: repeating-linear-gradient(0deg, rgba(0,0,0,.09) 0 1px, transparent 1px 4px); }
+  body.retro::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 998; background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,.28) 100%); }
   body.retro canvas { image-rendering: pixelated; }
   body.retro h1 { font-family: "Press Start 2P", "VT323", monospace; font-size: 15px; letter-spacing: 0; text-shadow: 0 0 9px rgba(57,255,110,.55); }
-  body.retro .sub { font-size: 15px; }
+  body.retro .sub { font-size: 17px; }
   body.retro .card { border-radius: 0; border-width: 2px; box-shadow: 4px 4px 0 rgba(0,0,0,.55); }
   body.retro button, body.retro .tfbox, body.retro .chip, body.retro .badge, body.retro .tabs { border-radius: 0; }
-  body.retro button { border-width: 2px; font-size: 15px; box-shadow: 2px 2px 0 rgba(0,0,0,.55); text-transform: uppercase; }
+  body.retro button { border-width: 2px; font-size: 16px; box-shadow: 2px 2px 0 rgba(0,0,0,.55); text-transform: uppercase; }
   body.retro button:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 rgba(0,0,0,.55); }
-  body.retro .badge { font-family: "Press Start 2P", "VT323", monospace; font-size: 8px; letter-spacing: 0; }
-  body.retro .tfbtn { font-size: 15px; }
+  body.retro .badge { font-family: "Press Start 2P", "VT323", monospace; font-size: 9px; letter-spacing: 0; }
+  body.retro .tfbtn { font-size: 16px; }
   body.retro .tfbtn.active, body.retro .tab.active, body.retro .chip.on { color: #012b0e; }
-  body.retro .stat .label, body.retro .idx .label { font-family: "Press Start 2P", "VT323", monospace; font-size: 8px; letter-spacing: .06em; }
-  body.retro .stat .value, body.retro .idx .ival { text-shadow: 0 0 7px currentColor; }
+  body.retro .stat .label, body.retro .idx .label { font-family: "Press Start 2P", "VT323", monospace; font-size: 9px; letter-spacing: .06em; }
+  body.retro .stat .value { font-size: 20px; text-shadow: 0 0 7px currentColor; }
+  body.retro .idx .ival { font-size: 28px; text-shadow: 0 0 7px currentColor; }
   body.retro .stock:hover { border-color: var(--up); }
   body.retro .stock .sym { text-shadow: 0 0 6px currentColor; }
-  body.retro .stock .name { font-size: 13px; }
-  body.retro .stock .trendcap, body.retro .idx .isub { font-size: 13px; }
+  body.retro .stock .name { font-size: 15px; }
+  body.retro .stock .price { font-size: 24px; }
+  body.retro .legend { font-size: 14px; }
+  body.retro .stock .trendcap, body.retro .idx .isub { font-size: 14px; }
   body.retro .tag { border-radius: 0; }
   body.retro .legend .dot { border-radius: 0; }
-  body.retro .footer { font-size: 14px; }
+  body.retro .footer { font-size: 15px; }
   body.retro #ticker { border-radius: 0; border-width: 2px; }
-  body.retro #ticker .tlabel { font-family: "Press Start 2P", "VT323", monospace; font-size: 8px; letter-spacing: 0; }
-  body.retro a.titem { font-size: 15px; }
+  body.retro #ticker .tlabel { font-family: "Press Start 2P", "VT323", monospace; font-size: 9px; letter-spacing: 0; }
+  body.retro a.titem { font-size: 17px; }
   body.retro .tsep::after { content: "+++"; }
-  body.retro .tab { font-size: 15px; text-transform: uppercase; }
-  body.retro .chip { font-size: 14px; }
+  body.retro .tab { font-size: 16px; text-transform: uppercase; }
+  body.retro .chip { font-size: 16px; }
   body.retro .news-head h2 { font-family: "Press Start 2P", "VT323", monospace; font-size: 13px; }
-  body.retro .news-item .nt { font-size: 16px; }
-  body.retro .news-item .nsnip { font-size: 14px; }
-  body.retro .news-item .nrow { font-size: 13px; }
-  body.retro .nsrc { border-radius: 0; font-size: 12px; }
+  body.retro .news-item .nt { font-size: 18px; }
+  body.retro .news-item .nsnip { font-size: 16px; }
+  body.retro .news-item .nrow { font-size: 14px; }
+  body.retro .nsrc { border-radius: 0; font-size: 13px; }
   @media (max-width: 640px) { .stats { grid-template-columns: repeat(2, 1fr); } }
 
   /* News feed */
@@ -750,7 +753,7 @@ function drawSpark(cv, data, up, hoverI) {
   ctx.fill();
   ctx.beginPath();
   data.forEach((d, i) => i ? ctx.lineTo(X(i), Y(d.p)) : ctx.moveTo(X(0), Y(d.p)));
-  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.strokeStyle = color; ctx.lineWidth = retro ? 2 : 1.5; ctx.stroke();
   ctx.beginPath();
   ctx.arc(X(data.length - 1), Y(ps[ps.length - 1]), 3, 0, Math.PI * 2);
   ctx.fillStyle = color; ctx.fill();
@@ -794,7 +797,7 @@ function drawMulti(cv, series, hoverI) {
   series.forEach(s => {
     ctx.beginPath();
     s.data.forEach((d, i) => i ? ctx.lineTo(X(s.data, i), Y(d.v)) : ctx.moveTo(X(s.data, 0), Y(d.v)));
-    ctx.strokeStyle = s.color; ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = s.color; ctx.lineWidth = retro ? 3 : 2; ctx.stroke();
     const last = s.data[s.data.length - 1];
     ctx.beginPath();
     ctx.arc(X(s.data, s.data.length - 1), Y(last.v), 3.5, 0, Math.PI * 2);
