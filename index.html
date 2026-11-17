@@ -424,9 +424,9 @@ const MCAPS = {
 };
 const CACHE_KEY = "climate_cache_v1";
 const TIMEFRAMES = {
-  "1M": { range: "1mo", interval: "1d", cap: "1-month \u00b7 daily closes" },
-  "1W": { range: "5d", interval: "15m", cap: "1-week \u00b7 15-min bars" },
-  "1D": { range: "1d", interval: "5m", cap: "1-day \u00b7 5-min bars" },
+  "1M": { range: "1mo", interval: "1d", grid: 86400, cap: "1-month \u00b7 daily closes" },
+  "1W": { range: "5d", interval: "15m", grid: 900, cap: "1-week \u00b7 15-min bars" },
+  "1D": { range: "1d", interval: "5m", grid: 300, cap: "1-day \u00b7 5-min bars" },
 };
 const cacheKeyFor = t => CACHE_KEY + "_" + t;
 function loadCache(t) {
@@ -503,6 +503,24 @@ async function proxyFetch(url, kind) {
   throw lastErr || new Error("all proxies failed");
 }
 
+// Yahoo tacks a live "current price" bar onto every intraday series,
+// stamped with the fetch moment (e.g. 20:13:04) instead of the bar
+// grid. One such bar per stock fans the index union into a cluster of
+// near-identical forward-filled points at the tail, which draws as a
+// flatlined right edge on the index chart (and a "today" of -0.00%).
+// Snap bar times to the interval grid, keeping the latest close per
+// slot, so all stocks share one clean timeline.
+function snapHist(hist, grid) {
+  const out = [];
+  hist.forEach(h => {
+    const t = h.t - (h.t % grid);
+    if (out.length && out[out.length - 1].t === t) out[out.length - 1].p = h.p;
+    else out.push({ t, p: h.p });
+  });
+  hist.length = 0;
+  hist.push.apply(hist, out);
+}
+
 async function fetchOne(sym, t) {
   const cfg = TIMEFRAMES[t];
   const target = "https://query1.finance.yahoo.com/v8/finance/chart/" +
@@ -517,6 +535,7 @@ async function fetchOne(sym, t) {
     res.indicators.quote[0].close) || [];
   const hist = [];
   ts.forEach((t, i) => { if (closes[i] != null) hist.push({ t, p: closes[i] }); });
+  snapHist(hist, cfg.grid);
   const price = m.regularMarketPrice;
   if (!price || !hist.length) throw new Error("empty");
   // day change vs previous close; on intraday TFs the last bar is ~now,
@@ -579,6 +598,7 @@ async function fetchSparkChunk(symbols, t) {
     if (!r || !r.close || r.close.length < 2) return;
     const hist = [];
     (r.timestamp || []).forEach((t, i) => { if (r.close[i] != null) hist.push({ t, p: r.close[i] }); });
+    snapHist(hist, cfg.grid);
     if (hist.length < 2) return;
     const price = r.fulldayPrice != null ? r.fulldayPrice : hist[hist.length - 1].p;
     const prev = r.previousClose != null ? r.previousClose : hist[hist.length - 2].p;
